@@ -1,0 +1,12 @@
+node_modules/
+.env
+dist/
+.DS_Store
+*.log
+
+# Lokale Quelldaten bleiben PRIVAT (nicht ins Repo):
+#   deine Excel, Overrides, TMDB-Cache, Reports, Backups, Review-Dateien
+data/
+
+# Die fertige App-Daten (public/movies.json + public/posters/) WERDEN eingecheckt,
+# damit die Online-App ohne TMDB-Key gebaut werden kann. -> daher NICHT ignoriert.

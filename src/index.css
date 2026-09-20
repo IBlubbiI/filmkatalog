@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-ink-900 text-zinc-100 font-sans antialiased;
+  /* iOS: Notch-Bereiche berücksichtigen */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+}
+
+/* Light-Mode (optional, via data-theme="light" am <html>) */
+html[data-theme='light'] {
+  color-scheme: light;
+}
+html[data-theme='light'] body {
+  @apply bg-zinc-100 text-zinc-900;
+}
+
+@layer components {
+  .skeleton {
+    @apply relative overflow-hidden bg-ink-750;
+  }
+  .skeleton::after {
+    content: '';
+    @apply absolute inset-0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+    transform: translateX(-100%);
+    animation: shimmer 1.4s infinite;
+  }
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* sanftes Fokus-Styling für Touch/Tastatur */
+:focus-visible {
+  @apply outline-none ring-2 ring-accent/70 ring-offset-2 ring-offset-ink-900;
+}

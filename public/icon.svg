@@ -1,0 +1,25 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" fill="#0e0e14"/>
+  <!-- Filmstreifen -->
+  <rect x="168" y="92" width="176" height="328" rx="20" fill="#e6b450"/>
+  <!-- Perforation links/rechts -->
+  <g fill="#0e0e14">
+    <rect x="184" y="112" width="20" height="24" rx="5"/>
+    <rect x="184" y="152" width="20" height="24" rx="5"/>
+    <rect x="184" y="192" width="20" height="24" rx="5"/>
+    <rect x="184" y="232" width="20" height="24" rx="5"/>
+    <rect x="184" y="272" width="20" height="24" rx="5"/>
+    <rect x="184" y="312" width="20" height="24" rx="5"/>
+    <rect x="184" y="352" width="20" height="24" rx="5"/>
+    <rect x="308" y="112" width="20" height="24" rx="5"/>
+    <rect x="308" y="152" width="20" height="24" rx="5"/>
+    <rect x="308" y="192" width="20" height="24" rx="5"/>
+    <rect x="308" y="232" width="20" height="24" rx="5"/>
+    <rect x="308" y="272" width="20" height="24" rx="5"/>
+    <rect x="308" y="312" width="20" height="24" rx="5"/>
+    <rect x="308" y="352" width="20" height="24" rx="5"/>
+  </g>
+  <!-- Play im Bildfenster -->
+  <rect x="216" y="188" width="80" height="136" rx="10" fill="#0e0e14"/>
+  <path d="M242 214 L280 256 L242 298 Z" fill="#e6b450"/>
+</svg>

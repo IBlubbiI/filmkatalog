@@ -1,0 +1,36 @@
+{
+  "name": "filmkatalog",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Persönlicher Filmsammlung-Katalog als PWA (read-only, offline-fähig)",
+  "scripts": {
+    "build:data": "node scripts/build-data.mjs",
+    "icons": "node scripts/make-icons.mjs",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "npm run build:data && npm run build"
+  },
+  "dependencies": {
+    "fuse.js": "^7.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "dotenv": "^16.4.5",
+    "postcss": "^8.4.38",
+    "sharp": "^0.33.4",
+    "tailwindcss": "^3.4.10",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.2",
+    "vite-plugin-pwa": "^0.20.5",
+    "xlsx": "^0.18.5"
+  }
+}
