@@ -2,8 +2,51 @@ import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useData } from '../lib/data';
 import { useUserData } from '../lib/userData';
+import { useDriveSync } from '../lib/driveSync';
 import { IconChevronLeft } from '../components/Icons';
 import type { Movie } from '../types';
+
+function DriveSync() {
+  const s = useDriveSync();
+  const time = s.lastSync ? new Date(s.lastSync).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : null;
+  return (
+    <div className="mt-4 border-t border-ink-700/70 pt-4">
+      <h3 className="mb-1 text-sm font-semibold text-zinc-200">Geräte-Sync über Google Drive</h3>
+      {!s.enabled ? (
+        <p className="text-xs text-zinc-500">Wird gerade eingerichtet – danach kannst du Tablet & Handy hier verbinden.</p>
+      ) : s.status === 'connected' ? (
+        <div>
+          <p className="mb-2 text-xs text-accent-soft">
+            ✓ Mit Google Drive verbunden{time ? ` · zuletzt abgeglichen ${time}` : ''}
+            {s.syncing ? ' · synchronisiere …' : ''}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={s.syncNow} disabled={s.syncing} className="rounded-lg bg-ink-700 px-3 py-2 text-sm text-zinc-200 hover:bg-ink-600 disabled:opacity-40">
+              Jetzt synchronisieren
+            </button>
+            <button onClick={s.disconnect} className="rounded-lg px-3 py-2 text-sm text-zinc-400 hover:bg-ink-700">
+              Trennen
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <p className="mb-2 text-xs text-zinc-500">
+            Verbinde dein Google-Konto, damit deine Bewertungen automatisch zwischen deinen Geräten abgeglichen werden.
+          </p>
+          <button
+            onClick={s.connect}
+            disabled={s.status === 'connecting'}
+            className="rounded-lg bg-accent px-3 py-2 text-sm font-bold text-ink-950 hover:bg-accent-soft disabled:opacity-50"
+          >
+            {s.status === 'connecting' ? 'Verbinde …' : 'Mit Google Drive verbinden'}
+          </button>
+          {s.status === 'error' && s.error && <p className="mt-2 text-xs text-red-300/80">Fehler: {s.error}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function MyDataSection() {
   const { data, count, exportJSON, importJSON, clearAll } = useUserData();
@@ -52,9 +95,11 @@ function MyDataSection() {
       </div>
       {msg && <p className="mt-2 text-xs text-accent-soft">{msg}</p>}
       <p className="mt-3 text-[11px] leading-relaxed text-zinc-600">
-        Hinweis: Diese Bewertungen liegen nur in diesem Browser/auf diesem Gerät (nicht in der Excel). Mit „Sichern" legst du
-        eine Datei zum Aufbewahren oder Übertragen auf ein anderes Gerät an.
+        Hinweis: Diese Bewertungen liegen auf diesem Gerät (nicht in der Excel). Mit „Sichern" legst du eine Datei zum
+        Aufbewahren an – oder du verbindest unten Google Drive für den automatischen Abgleich zwischen deinen Geräten.
       </p>
+
+      <DriveSync />
     </section>
   );
 }

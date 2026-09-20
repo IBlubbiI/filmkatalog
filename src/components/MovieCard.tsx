@@ -27,6 +27,19 @@ function RatingPill({ movie, className = '' }: { movie: Movie; className?: strin
   );
 }
 
+/** Eigene Bewertung: gold gefüllt mit dunkler Schrift – klar abgesetzt von der (dunklen) TMDB-Pille. */
+function OwnRatingPill({ rating }: { rating: number }) {
+  return (
+    <span
+      className="inline-flex items-center gap-0.5 rounded-md bg-accent px-1.5 py-0.5 text-[11px] font-bold text-ink-950 shadow ring-1 ring-black/10"
+      title="Meine Bewertung"
+    >
+      <IconStar width={11} height={11} />
+      {rating.toFixed(1)}
+    </span>
+  );
+}
+
 function Badges({ movie, badges }: { movie: Movie; badges: string[] }) {
   if (!badges.length) return null;
   return (
@@ -48,7 +61,9 @@ export function MovieCard({ movie }: { movie: Movie }) {
   const { groupBadges } = useData();
   const { entry } = useUserData();
   const badges = groupBadges.get(movie.id) ?? formatBadges(movie);
-  const seen = entry(movie.id).seen ?? movie.seen ?? false;
+  const u = entry(movie.id);
+  const seen = u.seen ?? movie.seen ?? false;
+  const ownRating = u.rating ?? movie.rating ?? null;
   return (
     <Link
       to={`/film/${movie.id}`}
@@ -58,8 +73,9 @@ export function MovieCard({ movie }: { movie: Movie }) {
       <div className="relative overflow-hidden rounded-xl shadow-poster ring-1 ring-white/5 transition-transform duration-200 group-active:scale-[0.97]">
         <PosterImage movie={movie} />
         <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-1.5">
-          <div className="flex justify-end">
+          <div className="flex flex-col items-end gap-1">
             <RatingPill movie={movie} />
+            {ownRating != null && <OwnRatingPill rating={ownRating} />}
           </div>
           <div className="flex items-end justify-between gap-1">
             <Badges movie={movie} badges={badges} />

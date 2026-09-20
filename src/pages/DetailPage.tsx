@@ -9,8 +9,11 @@ import { IconChevronLeft, IconStar, IconHome, IconCheck } from '../components/Ic
 import type { Movie } from '../types';
 
 function MyRatingPanel({ movie }: { movie: Movie }) {
+  const data = useData();
   const { entry, setSeen, setRating, setWatchCount } = useUserData();
-  const e = entry(movie.id);
+  // Bewertung gilt film-weit: immer am Gruppen-Primär speichern, egal welche Ausgabe offen ist
+  const rid = (movie.groupId && data.groups.get(movie.groupId)?.[0]?.id) || movie.id;
+  const e = entry(rid);
   const rating = e.rating ?? movie.rating ?? null;
   const seen = e.seen ?? movie.seen ?? false;
   const watchCount = e.watchCount ?? (seen ? 1 : 0);
@@ -19,9 +22,9 @@ function MyRatingPanel({ movie }: { movie: Movie }) {
     <section className="mt-5 rounded-xl bg-ink-800/60 p-4 ring-1 ring-white/5">
       <div className="mb-2 flex items-baseline justify-between">
         <h3 className="text-sm font-semibold text-zinc-200">Meine Bewertung</h3>
-        <span className="tabular-nums text-2xl font-bold text-accent-soft">
+        <span className="tabular-nums text-3xl font-bold leading-none text-accent-soft">
           {rating != null ? rating.toFixed(1) : '–'}
-          <span className="text-sm font-normal text-zinc-500">/10</span>
+          <span className="text-2xl font-semibold text-zinc-500">/10</span>
         </span>
       </div>
       <input
@@ -30,14 +33,14 @@ function MyRatingPanel({ movie }: { movie: Movie }) {
         max={10}
         step={0.1}
         value={rating ?? 7.5}
-        onChange={(ev) => setRating(movie.id, Number(ev.target.value))}
+        onChange={(ev) => setRating(rid, Number(ev.target.value))}
         className="w-full accent-accent"
         aria-label="Bewertung"
       />
       <div className="mt-0.5 flex items-center justify-between text-[11px] text-zinc-500">
         <span>1,0</span>
         {rating != null ? (
-          <button onClick={() => setRating(movie.id, null)} className="text-zinc-400 hover:underline">
+          <button onClick={() => setRating(rid, null)} className="text-zinc-400 hover:underline">
             Bewertung löschen
           </button>
         ) : (
@@ -48,7 +51,7 @@ function MyRatingPanel({ movie }: { movie: Movie }) {
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <button
-          onClick={() => setSeen(movie.id, !seen)}
+          onClick={() => setSeen(rid, !seen)}
           className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
             seen ? 'bg-accent/15 text-accent-soft ring-1 ring-accent/40' : 'bg-ink-700 text-zinc-300 hover:bg-ink-600'
           }`}
@@ -59,11 +62,11 @@ function MyRatingPanel({ movie }: { movie: Movie }) {
         {seen && (
           <div className="flex items-center gap-2 text-sm text-zinc-300">
             <div className="flex items-center overflow-hidden rounded-lg border border-ink-600">
-              <button onClick={() => setWatchCount(movie.id, watchCount - 1)} className="px-3 py-1.5 text-lg leading-none hover:bg-ink-700" aria-label="weniger">
+              <button onClick={() => setWatchCount(rid, watchCount - 1)} className="px-3 py-1.5 text-lg leading-none hover:bg-ink-700" aria-label="weniger">
                 −
               </button>
               <span className="min-w-[3.5rem] px-2 text-center tabular-nums">{watchCount}× </span>
-              <button onClick={() => setWatchCount(movie.id, watchCount + 1)} className="px-3 py-1.5 text-lg leading-none hover:bg-ink-700" aria-label="mehr">
+              <button onClick={() => setWatchCount(rid, watchCount + 1)} className="px-3 py-1.5 text-lg leading-none hover:bg-ink-700" aria-label="mehr">
                 +
               </button>
             </div>

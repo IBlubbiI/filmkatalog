@@ -3,6 +3,7 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
 import { DataProvider, useData } from './lib/data';
 import { CatalogStateProvider } from './lib/catalogState';
 import { UserDataProvider } from './lib/userData';
+import { DriveSyncProvider } from './lib/driveSync';
 import { CatalogPage } from './pages/CatalogPage';
 import { DetailPage } from './pages/DetailPage';
 import { StatsPage } from './pages/StatsPage';
@@ -42,6 +43,7 @@ export default function App() {
   return (
     <DataProvider>
       <UserDataProvider>
+        <DriveSyncProvider>
         <CatalogStateProvider>
         <HashRouter>
           <DataError />
@@ -54,6 +56,7 @@ export default function App() {
           <UpdateToast />
         </HashRouter>
         </CatalogStateProvider>
+        </DriveSyncProvider>
       </UserDataProvider>
     </DataProvider>
   );

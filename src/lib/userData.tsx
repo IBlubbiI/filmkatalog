@@ -5,8 +5,11 @@ export interface UserEntry {
   seen?: boolean;
   rating?: number | null; // 1.0–10.0, eine Nachkommastelle
   watchCount?: number; // wie oft gesehen (>=1)
+  updatedAt?: number; // Zeitstempel (ms) für Merge zwischen Geräten
 }
 export type UserDataMap = Record<string, UserEntry>;
+
+const hasData = (e: UserEntry) => !!e && (e.seen || e.rating != null || !!e.watchCount);
 
 const KEY = 'filmkatalog.userdata.v1';
 
@@ -20,6 +23,9 @@ interface Ctx {
   exportJSON: () => void;
   importJSON: (file: File) => Promise<{ ok: boolean; msg: string }>;
   clearAll: () => void;
+  // für Geräte-Sync:
+  snapshot: () => UserDataMap;
+  mergeRemote: (remote: UserDataMap) => UserDataMap; // je Film neueren Zeitstempel behalten
 }
 
 const C = createContext<Ctx | null>(null);
@@ -46,15 +52,9 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
   }, [data]);
 
   const patch = useCallback((id: string, p: Partial<UserEntry>) => {
-    setData((d) => {
-      const next: UserEntry = { ...d[id], ...p };
-      // leere Einträge wieder entfernen
-      if (!next.seen && (next.rating == null) && !next.watchCount) {
-        const { [id]: _drop, ...rest } = d;
-        return rest;
-      }
-      return { ...d, [id]: next };
-    });
+    // Leere Einträge bleiben als "Tombstone" (mit Zeitstempel) erhalten, damit ein
+    // Löschen auch beim Geräte-Merge greift.
+    setData((d) => ({ ...d, [id]: { ...d[id], ...p, updatedAt: Date.now() } }));
   }, []);
 
   const setSeen = useCallback(
@@ -93,6 +93,18 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
 
   const clearAll = useCallback(() => setData({}), []);
 
+  const snapshot = useCallback(() => dataRef.current, []);
+  const mergeRemote = useCallback((remote: UserDataMap) => {
+    const local = dataRef.current;
+    const merged: UserDataMap = { ...local };
+    for (const [id, r] of Object.entries(remote || {})) {
+      const l = merged[id];
+      if (!l || (r.updatedAt ?? 0) > (l.updatedAt ?? 0)) merged[id] = r;
+    }
+    setData(merged);
+    return merged;
+  }, []);
+
   const value = useMemo<Ctx>(
     () => ({
       data,
@@ -100,12 +112,14 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
       setSeen,
       setRating,
       setWatchCount,
-      count: Object.keys(data).length,
+      count: Object.values(data).filter(hasData).length,
       exportJSON,
       importJSON,
       clearAll,
+      snapshot,
+      mergeRemote,
     }),
-    [data, setSeen, setRating, setWatchCount, exportJSON, importJSON, clearAll],
+    [data, setSeen, setRating, setWatchCount, exportJSON, importJSON, clearAll, snapshot, mergeRemote],
   );
 
   return <C.Provider value={value}>{children}</C.Provider>;
