@@ -7,13 +7,28 @@ export interface NamedCount {
   count: number;
 }
 
+export interface DiscoverCast {
+  name: string;
+  character: string | null;
+  profile: string | null;
+}
 export interface CollectionPart {
   tmdbId: number;
   title: string;
   year: string | null;
   poster: string | null;
+  type?: 'movie' | 'tv';
+  future?: boolean; // Erstveröffentlichung liegt noch in der Zukunft (sonst: schon erschienen)
+  // Detailinfos (nur für nicht besessene Titel gefüllt) – für die Entdecken-Seite
+  overview?: string | null;
+  rating?: number | null;
+  runtime?: number | null;
+  seasons?: number | null;
+  backdrop?: string | null;
+  cast?: DiscoverCast[];
 }
 export type Collections = Record<string, { name: string; parts: CollectionPart[] }>;
+export type CollectionExtras = Record<string, CollectionPart[]>;
 
 interface DataState {
   doc: MoviesDoc | null;
@@ -32,6 +47,8 @@ interface DataState {
   categories: string[]; // übergeordnete Kategorien (Marvel, DC, …)
   aspectRatios: string[]; // Bildformate, nach Seitenverhältnis sortiert (schmal → breit)
   collections: Collections; // TMDB-Filmreihen (id -> Teile) für die Sammlung-Ansicht
+  collectionExtras: CollectionExtras; // kuratierte Zusatztitel je Reihe (Ableger/Spinoffs)
+  discoverById: Map<number, CollectionPart>; // nicht besessene Titel nach tmdbId (Entdecken-Seite)
   loading: boolean;
   error: string | null;
 }
@@ -49,6 +66,7 @@ const Ctx = createContext<DataState | null>(null);
 export function DataProvider({ children }: { children: ReactNode }) {
   const [doc, setDoc] = useState<MoviesDoc | null>(null);
   const [collections, setCollections] = useState<Collections>({});
+  const [collectionExtras, setCollectionExtras] = useState<CollectionExtras>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,6 +75,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       .then((r) => (r.ok ? r.json() : {}))
       .then((c) => setCollections(c || {}))
       .catch(() => setCollections({}));
+    fetch(`${import.meta.env.BASE_URL}collection-extras.json`, { cache: 'no-cache' })
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((c) => setCollectionExtras(c || {}))
+      .catch(() => setCollectionExtras({}));
   }, []);
 
   useEffect(() => {
@@ -153,6 +175,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       (a, b) => ratioNum(a) - ratioNum(b),
     );
 
+    // Nachschlage-Index für die Entdecken-Detailseite (nicht besessene Titel nach tmdbId)
+    const discoverById = new Map<number, CollectionPart>();
+    for (const coll of Object.values(collections)) for (const p of coll.parts) if (!discoverById.has(p.tmdbId)) discoverById.set(p.tmdbId, p);
+    for (const arr of Object.values(collectionExtras)) for (const p of arr) if (!discoverById.has(p.tmdbId)) discoverById.set(p.tmdbId, p);
+
     return {
       doc,
       movies,
@@ -170,10 +197,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
       categories,
       aspectRatios,
       collections,
+      collectionExtras,
+      discoverById,
       loading,
       error,
     };
-  }, [doc, collections, loading, error]);
+  }, [doc, collections, collectionExtras, loading, error]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -1,0 +1,49 @@
+name: Sammlung-Daten auffrischen
+
+# Frischt regelmäßig die Reihen-/Disc-Release-Daten der "Sammlung"-Ansicht auf,
+# ohne dass lokal neu gebaut werden muss. Nutzt NUR die bereits im Repo liegende
+# public/movies.json (kein Zugriff auf die private Excel) + den TMDB-Key aus den
+# Repo-Secrets. Neue Reihen-Teile und frische Disc-Releases landen so automatisch
+# in collections.json / collection-extras.json; der Commit stößt das Deploy an.
+#
+# Einrichtung: Repo → Settings → Secrets and variables → Actions → New secret
+#   Name  = TMDB_API_KEY
+#   Value = <dein TMDB v3 API Key>
+
+on:
+  schedule:
+    - cron: '0 5 * * 1' # jeden Montag 05:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-series
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Sammlung-/Release-Daten neu bauen
+        env:
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: npm run build:series
+      - name: Änderungen committen (falls vorhanden)
+        run: |
+          if git diff --quiet -- public/collections.json public/collection-extras.json; then
+            echo "Keine Änderungen an den Sammlung-Daten."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/collections.json public/collection-extras.json
+          git commit -m "chore: Sammlung-/Release-Daten automatisch aktualisiert"
+          git push

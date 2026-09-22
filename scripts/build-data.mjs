@@ -26,6 +26,7 @@ import 'dotenv/config';
 import * as XLSX from 'xlsx';
 import { universeOf } from './lib/universe-map.mjs';
 import { canonicalLabel } from './lib/label-map.mjs';
+import { buildSeriesData } from './lib/series.mjs';
 import { makeTmdbClient, downloadImage } from './lib/tmdb.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -33,8 +34,6 @@ const ROOT = path.resolve(__dirname, '..');
 const XLSX_PATH = path.join(ROOT, 'data', 'Filmsammlung.xlsx');
 const SHEET = 'Filme – Übersicht';
 const OUT_JSON = path.join(ROOT, 'public', 'movies.json');
-const COLLECTIONS_PATH = path.join(ROOT, 'public', 'collections.json');
-const COLLECTIONS_CACHE = path.join(ROOT, 'data', 'tmdb-collections-cache.json');
 const POSTER_DIR = path.join(ROOT, 'public', 'posters');
 const CACHE_PATH = path.join(ROOT, 'data', 'tmdb-cache.json');
 const OVERRIDES_PATH = path.join(ROOT, 'data', 'tmdb-overrides.json');
@@ -518,30 +517,9 @@ if (NO_TMDB || !TMDB_KEY) {
   fs.writeFileSync(CACHE_PATH, JSON.stringify(cache, null, 2));
   log(`✓ TMDB fertig: ${fetched} neu geholt, ${fromCache} aus Cache, ${failed} ohne Treffer.`);
 
-  // TMDB-Filmreihen (Collections) für die "Sammlung"-Ansicht mit Platzhaltern holen
-  const collCache = readJson(COLLECTIONS_CACHE, {});
-  const collIds = [...new Set(movies.map((m) => m.tmdb?.collection?.id).filter(Boolean))];
-  let collFetched = 0;
-  for (const cid of collIds) {
-    if (!REFRESH && collCache[cid]) continue;
-    try {
-      const c = await client.collection(cid);
-      collCache[cid] = {
-        name: c.name,
-        parts: (c.parts || [])
-          .map((p) => ({ tmdbId: p.id, title: p.title, year: (p.release_date || '').slice(0, 4) || null, poster: p.poster_path || null }))
-          .sort((a, b) => (a.year || 9999) - (b.year || 9999)),
-      };
-      collFetched++;
-    } catch (e) {
-      warn(`Sammlung ${cid}: ${e.message}`);
-    }
-  }
-  fs.writeFileSync(COLLECTIONS_CACHE, JSON.stringify(collCache, null, 2));
-  const collectionsOut = {};
-  for (const cid of collIds) if (collCache[cid]) collectionsOut[cid] = collCache[cid];
-  fs.writeFileSync(COLLECTIONS_PATH, JSON.stringify(collectionsOut));
-  log(`✓ ${Object.keys(collectionsOut).length} Filmreihen (${collFetched} neu geholt).`);
+  // Sammlung-Ansicht: Filmreihen + Ableger + Disc-Release-Status (eigenes Modul,
+  // damit derselbe Schritt auch in der CI aus public/movies.json laufen kann)
+  await buildSeriesData({ movies, client, root: ROOT, refresh: REFRESH, log, warn });
 }
 
 // ---------------------------------------------------------------------------

@@ -15,6 +15,17 @@ export const UNIVERSE_MAP = {
   // damit "Weitere Filme dieser Reihe" bei jedem MCU-Film alle MCU-Filme zeigt.
   'Iron Man / MCU': 'Marvel Cinematic Universe (MCU)',
 
+  // DCEU: uneinheitliche Schreibweisen in der Excel auf EINE Reihe vereinheitlichen
+  // (sonst zeigt die Sammlung "DC Extended Universe" und "… (DCEU)" getrennt).
+  'DC Extended Universe': 'DC Extended Universe (DCEU)',
+
+  // Tarantino: die Box-Varianten zu EINER Reihe zusammenfassen.
+  'Tarantino XX / Kill Bill': 'Tarantino XX',
+  'Tarantino XX / Grindhouse': 'Tarantino XX',
+
+  // Drachenzähmen: Live-Action + Animationsfilme unter einer Reihe führen.
+  'Drachenzähmen leicht gemacht (Live-Action)': 'Drachenzähmen leicht gemacht',
+
   // Astrid-Lindgren-Verfilmungen (Pippi, Michel …) zu einer Reihe zusammenfassen
   'Pippi Langstrumpf': 'Astrid Lindgren',
   'Michel aus Lönneberga': 'Astrid Lindgren',
@@ -28,6 +39,9 @@ export const UNIVERSE_MAP = {
 // oder uneinheitlich ist (Datenlücken). ID gewinnt vor dem Franchise-Mapping.
 export const UNIVERSE_BY_ID = {
   F318: 'Märchenfilme', // Drei Haselnüsse für Aschenbrödel (ohne Franchise)
+  // Django & Hateful 8 gehören für den Nutzer zur Tarantino-Reihe (Franchise leer):
+  F017: 'Tarantino XX',
+  F018: 'Tarantino XX',
   // Augsburger Puppenkiste (Franchise teils leer):
   F353: 'Augsburger Puppenkiste',
   F354: 'Augsburger Puppenkiste',
@@ -36,8 +50,19 @@ export const UNIVERSE_BY_ID = {
   F357: 'Augsburger Puppenkiste',
 };
 
+// Das "Universum" (breite Sammlung-Gruppe) eines Films bestimmen.
+// Konvention in der Excel-Spalte "Reihe/Franchise": "<Unter-Reihe> / <Übergeordnet>"
+// – der Teil NACH dem letzten " / " ist die Sammlung-Gruppe (z. B.
+// "The Dark Knight Trilogie / Christopher Nolan" → Gruppe "Christopher Nolan").
+// Ein Voll-String-Eintrag in UNIVERSE_MAP hat Vorrang (für Altbestand wie
+// "Iron Man / MCU" → "Marvel Cinematic Universe (MCU)").
 export function universeOf(franchise, id) {
   if (id && UNIVERSE_BY_ID[id]) return UNIVERSE_BY_ID[id];
   if (!franchise) return null;
-  return UNIVERSE_MAP[franchise] ?? franchise;
+  if (UNIVERSE_MAP[franchise]) return UNIVERSE_MAP[franchise];
+  if (franchise.includes(' / ')) {
+    const broad = franchise.split(' / ').pop().trim();
+    return UNIVERSE_MAP[broad] ?? broad;
+  }
+  return franchise;
 }

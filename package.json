@@ -6,6 +6,7 @@
   "description": "Persönlicher Filmsammlung-Katalog als PWA (read-only, offline-fähig)",
   "scripts": {
     "build:data": "node scripts/build-data.mjs",
+    "build:series": "node scripts/build-series.mjs",
     "icons": "node scripts/make-icons.mjs",
     "dev": "vite",
     "build": "vite build",
