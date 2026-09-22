@@ -7,6 +7,7 @@ import { DriveSyncProvider } from './lib/driveSync';
 import { CatalogPage } from './pages/CatalogPage';
 import { DetailPage } from './pages/DetailPage';
 import { StatsPage } from './pages/StatsPage';
+import { SammlungPage } from './pages/SammlungPage';
 import { IconClose } from './components/Icons';
 
 function UpdateToast() {
@@ -50,6 +51,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<CatalogPage />} />
             <Route path="/film/:id" element={<DetailPage />} />
+            <Route path="/sammlung" element={<SammlungPage />} />
             <Route path="/stats" element={<StatsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

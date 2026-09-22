@@ -14,6 +14,7 @@ export interface FilterState {
   genreMode: GenreMode;
   genreText: string;
   fsk: FskValue[];
+  aspectRatio: string[]; // Bildformat, z. B. "1.85:1", "2.39:1", "unbekannt"
   type: ('Film' | 'Serie')[];
   director: string | null;
   franchise: string | null;
@@ -37,6 +38,7 @@ export function emptyFilters(): FilterState {
     genreMode: 'or',
     genreText: '',
     fsk: [],
+    aspectRatio: [],
     type: [],
     director: null,
     franchise: null,
@@ -72,6 +74,7 @@ export const DIMS: Record<string, (m: Movie, s: FilterState) => boolean> = {
     return [m.mainGenre, ...m.genres].some((g) => !!g && g.toLowerCase().includes(q));
   },
   fsk: (m, s) => s.fsk.length === 0 || s.fsk.includes(m.fsk == null ? 'unbekannt' : m.fsk),
+  aspectRatio: (m, s) => s.aspectRatio.length === 0 || s.aspectRatio.includes(m.aspectRatio ?? 'unbekannt'),
   type: (m, s) => s.type.length === 0 || s.type.includes(m.type),
   director: (m, s) => !s.director || m.directors.includes(s.director),
   franchise: (m, s) => !s.franchise || m.franchise === s.franchise,
@@ -108,6 +111,7 @@ export function activeCount(s: FilterState): number {
   n += s.mainGenre.length;
   n += s.genreText.trim() ? 1 : 0;
   n += s.fsk.length;
+  n += s.aspectRatio.length;
   n += s.type.length;
   n += s.director ? 1 : 0;
   n += s.franchise ? 1 : 0;

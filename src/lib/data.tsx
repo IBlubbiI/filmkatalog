@@ -7,6 +7,14 @@ export interface NamedCount {
   count: number;
 }
 
+export interface CollectionPart {
+  tmdbId: number;
+  title: string;
+  year: string | null;
+  poster: string | null;
+}
+export type Collections = Record<string, { name: string; parts: CollectionPart[] }>;
+
 interface DataState {
   doc: MoviesDoc | null;
   movies: Movie[];
@@ -22,6 +30,8 @@ interface DataState {
   decades: string[];
   mainGenres: string[]; // kanonische Hauptgenres (saubere Chip-Liste)
   categories: string[]; // übergeordnete Kategorien (Marvel, DC, …)
+  aspectRatios: string[]; // Bildformate, nach Seitenverhältnis sortiert (schmal → breit)
+  collections: Collections; // TMDB-Filmreihen (id -> Teile) für die Sammlung-Ansicht
   loading: boolean;
   error: string | null;
 }
@@ -38,8 +48,16 @@ const Ctx = createContext<DataState | null>(null);
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const [doc, setDoc] = useState<MoviesDoc | null>(null);
+  const [collections, setCollections] = useState<Collections>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`${import.meta.env.BASE_URL}collections.json`, { cache: 'no-cache' })
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((c) => setCollections(c || {}))
+      .catch(() => setCollections({}));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -126,6 +144,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const categories = [...new Set(movies.map((m) => m.category).filter((c): c is string => !!c))].sort((a, b) =>
       a.localeCompare(b, 'de'),
     );
+    // Bildformate nach numerischem Seitenverhältnis (schmal -> breit)
+    const ratioNum = (s: string) => {
+      const [w, h] = s.split(':').map(Number);
+      return h ? w / h : 99;
+    };
+    const aspectRatios = [...new Set(movies.map((m) => m.aspectRatio).filter((a): a is string => !!a))].sort(
+      (a, b) => ratioNum(a) - ratioNum(b),
+    );
 
     return {
       doc,
@@ -142,10 +168,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
       decades,
       mainGenres,
       categories,
+      aspectRatios,
+      collections,
       loading,
       error,
     };
-  }, [doc, loading, error]);
+  }, [doc, collections, loading, error]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

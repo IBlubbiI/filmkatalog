@@ -1,3 +1,14 @@
+export interface CastMember {
+  name: string;
+  character: string | null;
+  profile: string | null; // TMDB-Profilpfad (/xxx.jpg) oder null
+}
+
+export interface TmdbCollection {
+  id: number;
+  name: string;
+}
+
 export interface Tmdb {
   tmdbId: number;
   rating: number | null;
@@ -5,6 +16,8 @@ export interface Tmdb {
   overview: string | null;
   poster: string | null;
   backdrop: string | null;
+  cast: CastMember[];
+  collection: TmdbCollection | null;
 }
 
 export interface Movie {

@@ -102,6 +102,7 @@ export function FilterSheet({ open, onClose, movies, state, setState }: Props) {
   );
   const decadeC = useMemo(() => facetCounts(movies, state, 'decade', (m) => m.decade), [movies, state]);
   const catC = useMemo(() => facetCounts(movies, state, 'category', (m) => m.category), [movies, state]);
+  const arC = useMemo(() => facetCounts(movies, state, 'aspectRatio', (m) => m.aspectRatio ?? 'unbekannt'), [movies, state]);
   const seenC = useMemo(
     () =>
       facetCounts<SeenValue>(movies, state, 'seen', (m) =>
@@ -255,6 +256,17 @@ export function FilterSheet({ open, onClose, movies, state, setState }: Props) {
                   onClick={() => toggleArr('fsk', f)}
                 />
               ))}
+            </div>
+          </Section>
+
+          <Section title="Bildformat" hint="wenig Balken auf 16:9 → 1.78:1 / 1.85:1">
+            <div className="flex flex-wrap gap-2">
+              {data.aspectRatios.map((a) => (
+                <Chip key={a} label={a} count={arC.get(a) ?? 0} active={state.aspectRatio.includes(a)} onClick={() => toggleArr('aspectRatio', a)} />
+              ))}
+              {(arC.get('unbekannt') ?? 0) > 0 && (
+                <Chip label="unbekannt" count={arC.get('unbekannt') ?? 0} active={state.aspectRatio.includes('unbekannt')} onClick={() => toggleArr('aspectRatio', 'unbekannt')} />
+              )}
             </div>
           </Section>
 

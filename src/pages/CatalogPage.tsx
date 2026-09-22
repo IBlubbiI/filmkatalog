@@ -11,7 +11,7 @@ import { MovieCard, MovieRow } from '../components/MovieCard';
 import { FilterSheet } from '../components/FilterSheet';
 import { ActiveChips } from '../components/ActiveChips';
 import { RandomModal } from '../components/RandomModal';
-import { IconSearch, IconFilter, IconGrid, IconList, IconDice, IconChart, IconClose } from '../components/Icons';
+import { IconSearch, IconFilter, IconGrid, IconList, IconDice, IconChart, IconClose, IconLayers } from '../components/Icons';
 
 /** Ausgaben desselben Films zu einer Karte zusammenfassen (Primär = beste Disc). */
 function collapse(list: Movie[], groups: Map<string, Movie[]>): Movie[] {
@@ -67,9 +67,14 @@ export function CatalogPage() {
               {data.uniqueCount} Titel · {data.movies.length} Ausgaben{stand && ` · Stand ${stand}`}
             </p>
           </div>
-          <Link to="/stats" className="rounded-full p-2 text-zinc-300 hover:bg-ink-800" aria-label="Statistik">
-            <IconChart />
-          </Link>
+          <div className="flex items-center gap-1">
+            <Link to="/sammlung" className="inline-flex items-center gap-1.5 rounded-full bg-ink-800 py-1.5 pl-2.5 pr-3 text-sm text-zinc-200 hover:bg-ink-700" aria-label="Sammlung">
+              <IconLayers width={18} height={18} /> Sammlung
+            </Link>
+            <Link to="/stats" className="rounded-full p-2 text-zinc-300 hover:bg-ink-800" aria-label="Statistik">
+              <IconChart />
+            </Link>
+          </div>
         </div>
         <div className="relative">
           <IconSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />

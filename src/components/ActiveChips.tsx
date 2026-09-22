@@ -29,6 +29,7 @@ function build(state: FilterState): Descriptor[] {
   state.mainGenre.forEach((g) => d.push({ label: g, clear: rmFrom('mainGenre', g) }));
   if (state.genreText.trim()) d.push({ label: `Genre: „${state.genreText}"`, clear: (s) => ({ ...s, genreText: '' }) });
   state.fsk.forEach((f) => d.push({ label: f === 'unbekannt' ? 'FSK ?' : `FSK ${f}`, clear: rmFrom('fsk', f) }));
+  state.aspectRatio.forEach((a) => d.push({ label: a, clear: rmFrom('aspectRatio', a) }));
   state.decade.forEach((dc) => d.push({ label: dc, clear: rmFrom('decade', dc) }));
   if (state.runtimeMax != null) d.push({ label: `≤ ${state.runtimeMax} Min.`, clear: (s) => ({ ...s, runtimeMax: null }) });
   if (state.director) d.push({ label: `Regie: ${state.director}`, clear: (s) => ({ ...s, director: null }) });

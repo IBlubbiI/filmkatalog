@@ -33,6 +33,8 @@ const ROOT = path.resolve(__dirname, '..');
 const XLSX_PATH = path.join(ROOT, 'data', 'Filmsammlung.xlsx');
 const SHEET = 'Filme – Übersicht';
 const OUT_JSON = path.join(ROOT, 'public', 'movies.json');
+const COLLECTIONS_PATH = path.join(ROOT, 'public', 'collections.json');
+const COLLECTIONS_CACHE = path.join(ROOT, 'data', 'tmdb-collections-cache.json');
 const POSTER_DIR = path.join(ROOT, 'public', 'posters');
 const CACHE_PATH = path.join(ROOT, 'data', 'tmdb-cache.json');
 const OVERRIDES_PATH = path.join(ROOT, 'data', 'tmdb-overrides.json');
@@ -237,7 +239,10 @@ function toMovie(r) {
     hasHdr,
     hasDolbyVision,
     native4k: yesNo(r['Natives 4K']),
-    aspectRatio: clean(r['Bildformat']),
+    aspectRatio: (() => {
+      const a = clean(r['Bildformat']);
+      return a && /^\d+(\.\d+)?\s*:\s*\d+$/.test(a) ? a : null; // Freitext ("nicht ermittelt…") -> null
+    })(),
     audioOriginal: clean(r['Beste OV-Tonspur']),
     audioGerman: clean(r['Beste DE-Tonspur']),
     atmos: yesNo(r['Atmos?']),
@@ -421,6 +426,14 @@ async function enrichFromTmdb(client, movie, tmdbId, isTv, score, source, poster
   // Fassung mit anderem Titelbild) -> immer neu laden, damit es ein altes ersetzt.
   const poster = await maybeDownload(posterOverride || det.poster_path, `${movie.id}.jpg`, 'w500', !!posterOverride);
   const backdrop = await maybeDownload(det.backdrop_path, `${movie.id}_bg.jpg`, 'w780');
+  // Wichtigste Darsteller (Top 8)
+  const cast = (det.credits?.cast || [])
+    .slice(0, 8)
+    .map((c) => ({ name: c.name, character: c.character || null, profile: c.profile_path || null }));
+  // TMDB-Sammlung (nur Filme) – für die "Sammlung"-Ansicht mit Platzhaltern
+  const collection = det.belongs_to_collection
+    ? { id: det.belongs_to_collection.id, name: det.belongs_to_collection.name }
+    : null;
   return {
     tmdbId,
     type: isTv ? 'tv' : 'movie',
@@ -429,6 +442,8 @@ async function enrichFromTmdb(client, movie, tmdbId, isTv, score, source, poster
     overview: overview || null,
     poster,
     backdrop,
+    cast,
+    collection,
     matchedTitle,
     matchedYear,
     score: score ?? null,
@@ -466,6 +481,7 @@ if (NO_TMDB || !TMDB_KEY) {
       m.tmdb = {
         tmdbId: cached.tmdbId, rating: cached.rating, votes: cached.votes,
         overview: cached.overview, poster: cached.poster, backdrop: cached.backdrop,
+        cast: cached.cast ?? [], collection: cached.collection ?? null,
       };
       matches.push({ id: m.id, excelTitle: m.title, excelYear: m.year, matchedTitle: cached.matchedTitle ?? null, matchedYear: cached.matchedYear ?? null, tmdbId: cached.tmdbId, score: cached.score ?? null, source: 'cache' });
       fromCache++;
@@ -484,7 +500,7 @@ if (NO_TMDB || !TMDB_KEY) {
       if (tmdbId != null) {
         const data = await enrichFromTmdb(client, m, tmdbId, isTv, score, source, posterOverride);
         cache[m.id] = data;
-        m.tmdb = { tmdbId: data.tmdbId, rating: data.rating, votes: data.votes, overview: data.overview, poster: data.poster, backdrop: data.backdrop };
+        m.tmdb = { tmdbId: data.tmdbId, rating: data.rating, votes: data.votes, overview: data.overview, poster: data.poster, backdrop: data.backdrop, cast: data.cast, collection: data.collection };
         matches.push({ id: m.id, excelTitle: m.title, excelYear: m.year, matchedTitle: data.matchedTitle, matchedYear: data.matchedYear, tmdbId, score: data.score, source });
         fetched++;
       } else {
@@ -501,6 +517,31 @@ if (NO_TMDB || !TMDB_KEY) {
   }
   fs.writeFileSync(CACHE_PATH, JSON.stringify(cache, null, 2));
   log(`✓ TMDB fertig: ${fetched} neu geholt, ${fromCache} aus Cache, ${failed} ohne Treffer.`);
+
+  // TMDB-Filmreihen (Collections) für die "Sammlung"-Ansicht mit Platzhaltern holen
+  const collCache = readJson(COLLECTIONS_CACHE, {});
+  const collIds = [...new Set(movies.map((m) => m.tmdb?.collection?.id).filter(Boolean))];
+  let collFetched = 0;
+  for (const cid of collIds) {
+    if (!REFRESH && collCache[cid]) continue;
+    try {
+      const c = await client.collection(cid);
+      collCache[cid] = {
+        name: c.name,
+        parts: (c.parts || [])
+          .map((p) => ({ tmdbId: p.id, title: p.title, year: (p.release_date || '').slice(0, 4) || null, poster: p.poster_path || null }))
+          .sort((a, b) => (a.year || 9999) - (b.year || 9999)),
+      };
+      collFetched++;
+    } catch (e) {
+      warn(`Sammlung ${cid}: ${e.message}`);
+    }
+  }
+  fs.writeFileSync(COLLECTIONS_CACHE, JSON.stringify(collCache, null, 2));
+  const collectionsOut = {};
+  for (const cid of collIds) if (collCache[cid]) collectionsOut[cid] = collCache[cid];
+  fs.writeFileSync(COLLECTIONS_PATH, JSON.stringify(collectionsOut));
+  log(`✓ ${Object.keys(collectionsOut).length} Filmreihen (${collFetched} neu geholt).`);
 }
 
 // ---------------------------------------------------------------------------

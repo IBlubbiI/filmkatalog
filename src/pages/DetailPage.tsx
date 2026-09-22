@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useData } from '../lib/data';
 import { useCatalog } from '../lib/catalogState';
@@ -6,7 +6,40 @@ import { useUserData } from '../lib/userData';
 import { PosterImage } from '../components/PosterImage';
 import { backdropUrl, formatRuntime, ratingPercent, yearLabel, fskLabel } from '../lib/format';
 import { IconChevronLeft, IconStar, IconHome, IconCheck } from '../components/Icons';
-import type { Movie } from '../types';
+import type { Movie, CastMember } from '../types';
+
+function CastAvatar({ c }: { c: CastMember }) {
+  const [failed, setFailed] = useState(false);
+  const url = c.profile && !failed ? `https://image.tmdb.org/t/p/w185${c.profile}` : null;
+  const initials = c.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('');
+  return (
+    <div className="mx-auto h-16 w-16 overflow-hidden rounded-full bg-ink-700 ring-1 ring-white/10">
+      {url ? (
+        <img src={url} loading="lazy" decoding="async" onError={() => setFailed(true)} alt={c.name} className="h-full w-full object-cover" />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-sm font-bold text-zinc-400">{initials}</div>
+      )}
+    </div>
+  );
+}
+
+function CastRow({ cast }: { cast: CastMember[] }) {
+  if (!cast?.length) return null;
+  return (
+    <section className="mt-5">
+      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-accent/80">Besetzung</h2>
+      <div className="no-scrollbar flex gap-3 overflow-x-auto pb-1">
+        {cast.map((c, i) => (
+          <div key={i} className="w-16 shrink-0">
+            <CastAvatar c={c} />
+            <p className="mt-1 truncate text-center text-[11px] font-medium text-zinc-200">{c.name}</p>
+            {c.character && <p className="truncate text-center text-[10px] text-zinc-500">{c.character}</p>}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 function MyRatingPanel({ movie }: { movie: Movie }) {
   const data = useData();
@@ -272,6 +305,9 @@ export function DetailPage() {
 
         {/* Kurzinhalt */}
         {movie.tmdb?.overview && <p className="mt-5 text-sm leading-relaxed text-zinc-300">{movie.tmdb.overview}</p>}
+
+        {/* Besetzung */}
+        <CastRow cast={movie.tmdb?.cast ?? []} />
 
         {/* Technik */}
         <Block title="Bild & Ton">

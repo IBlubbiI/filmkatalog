@@ -53,8 +53,9 @@ export function makeTmdbClient(key, { lang = 'de-DE' } = {}) {
       get('/search/movie', { query, year, language: lang, include_adult: false }),
     searchTv: (query, year) =>
       get('/search/tv', { query, first_air_date_year: year, language: lang, include_adult: false }),
-    movie: (id) => get(`/movie/${id}`, { language: lang }),
-    tv: (id) => get(`/tv/${id}`, { language: lang }),
+    movie: (id) => get(`/movie/${id}`, { language: lang, append_to_response: 'credits' }),
+    tv: (id) => get(`/tv/${id}`, { language: lang, append_to_response: 'credits' }),
+    collection: (id) => get(`/collection/${id}`, { language: lang }),
     // Deutschsprachiges Overview kann bei TMDB fehlen -> optionaler EN-Fallback
     movieEn: (id) => get(`/movie/${id}`, { language: 'en-US' }),
     tvEn: (id) => get(`/tv/${id}`, { language: 'en-US' }),
