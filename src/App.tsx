@@ -9,6 +9,7 @@ import { DetailPage } from './pages/DetailPage';
 import { StatsPage } from './pages/StatsPage';
 import { SammlungPage } from './pages/SammlungPage';
 import { DiscoverPage } from './pages/DiscoverPage';
+import { VerwaltenPage } from './pages/VerwaltenPage';
 import { IconClose } from './components/Icons';
 
 function UpdateToast() {
@@ -54,6 +55,7 @@ export default function App() {
             <Route path="/film/:id" element={<DetailPage />} />
             <Route path="/sammlung" element={<SammlungPage />} />
             <Route path="/entdecken/:tmdbId" element={<DiscoverPage />} />
+            <Route path="/verwalten" element={<VerwaltenPage />} />
             <Route path="/stats" element={<StatsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

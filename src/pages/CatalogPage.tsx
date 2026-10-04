@@ -11,7 +11,7 @@ import { MovieCard, MovieRow } from '../components/MovieCard';
 import { FilterSheet } from '../components/FilterSheet';
 import { ActiveChips } from '../components/ActiveChips';
 import { RandomModal } from '../components/RandomModal';
-import { IconSearch, IconFilter, IconGrid, IconList, IconDice, IconChart, IconClose, IconLayers } from '../components/Icons';
+import { IconSearch, IconFilter, IconGrid, IconList, IconDice, IconChart, IconClose, IconLayers, IconDisc } from '../components/Icons';
 
 /** Ausgaben desselben Films zu einer Karte zusammenfassen (Primär = beste Disc). */
 function collapse(list: Movie[], groups: Map<string, Movie[]>): Movie[] {
@@ -73,6 +73,9 @@ export function CatalogPage() {
             </Link>
             <Link to="/stats" className="rounded-full p-2 text-zinc-300 hover:bg-ink-800" aria-label="Statistik">
               <IconChart />
+            </Link>
+            <Link to="/verwalten" className="rounded-full p-2 text-zinc-500 hover:bg-ink-800 hover:text-zinc-300" aria-label="Verwalten" title="Verwalten">
+              <IconDisc />
             </Link>
           </div>
         </div>

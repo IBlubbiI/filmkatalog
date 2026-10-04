@@ -87,6 +87,27 @@ Deno.serve(async (req) => {
       case 'next_id':
         return json({ id: await nextId() });
 
+      case 'detail': {
+        const type = body.type === 'tv' ? 'tv' : 'movie';
+        const u = new URL(`https://api.themoviedb.org/3/${type}/${body.tmdbId}`);
+        u.searchParams.set('api_key', TMDB_KEY);
+        u.searchParams.set('language', 'de-DE');
+        u.searchParams.set('append_to_response', 'credits');
+        const d = await (await fetch(u)).json();
+        const date = type === 'tv' ? d.first_air_date : d.release_date;
+        const dir = (d.credits?.crew || []).filter((c: any) => c.job === 'Director').map((c: any) => c.name);
+        const creators = (d.created_by || []).map((c: any) => c.name);
+        return json({
+          title: d.title || d.name || null,
+          original_title: d.original_title || d.original_name || null,
+          year: (date || '').slice(0, 4) || null,
+          director: (dir.length ? dir : creators).join(', ') || null,
+          genres: (d.genres || []).map((g: any) => g.name),
+          runtime: d.runtime || (d.episode_run_time || [])[0] || null,
+          poster: d.poster_path || null,
+        });
+      }
+
       case 'upsert': {
         const movie = body.movie || {};
         if (!movie.id) movie.id = await nextId();
