@@ -1,14 +1,13 @@
 name: Sammlung aus Supabase bauen & deployen
 
-# Baut movies.json/Poster/Collections aus der Supabase-Datenbank und committet sie.
-# Der Commit auf main stößt den bestehenden Pages-Deploy (deploy.yml) an.
+# Baut movies.json/Poster/Collections aus Supabase, committet sie (Repo-Sync)
+# und deployt die App direkt zu GitHub Pages – alles in einem Lauf.
 #
 # Auslöser:
 #   - manuell (Actions → Run workflow)
-#   - per API: repository_dispatch { "event_type": "rebuild" }  (später aus der App)
+#   - per API: repository_dispatch { "event_type": "rebuild" }  (aus der App)
 #
-# Benötigte Repo-Secrets (Settings → Secrets and variables → Actions):
-#   SUPABASE_URL, SUPABASE_ANON_KEY, TMDB_API_KEY
+# Benötigte Repo-Secrets: SUPABASE_URL, SUPABASE_ANON_KEY, TMDB_API_KEY
 
 on:
   workflow_dispatch: {}
@@ -17,13 +16,15 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
-  group: rebuild-deploy
+  group: pages
   cancel-in-progress: false
 
 jobs:
-  rebuild:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,20 +33,52 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - name: movies.json + Poster + Collections aus Supabase bauen
+
+      # TMDB-Matching-Cache über Läufe hinweg aufheben → schnelle Rebuilds
+      - name: TMDB-Cache wiederherstellen
+        uses: actions/cache@v4
+        with:
+          path: |
+            data/tmdb-cache.json
+            data/tmdb-collections-cache.json
+            data/tmdb-detail-cache.json
+          key: tmdb-cache-${{ github.run_id }}
+          restore-keys: tmdb-cache-
+
+      - name: Daten aus Supabase bauen
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
         run: npm run build:data
-      - name: Änderungen committen (stößt Deploy an)
+
+      - name: Daten committen (Repo synchron halten)
         run: |
           if git diff --quiet -- public/; then
-            echo "Keine Änderungen an den Sammlung-Daten."
-            exit 0
+            echo "Keine Datenänderung."
+          else
+            git config user.name  "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add public/
+            git commit -m "chore: Sammlung aus Supabase aktualisiert"
+            git push
           fi
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/
-          git commit -m "chore: Sammlung aus Supabase aktualisiert"
-          git push
+
+      - name: App bauen
+        env:
+          VITE_BASE: /${{ github.event.repository.name }}/
+        run: npm run build
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

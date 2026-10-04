@@ -101,25 +101,36 @@ export async function buildSeriesData({ movies, client, root, refresh = false, l
     (d.credits?.cast || []).slice(0, 8).map((c) => ({ name: c.name, character: c.character || null, profile: c.profile_path || null }));
   const rd2 = (v) => (typeof v === 'number' && v > 0 ? Math.round(v * 10) / 10 : null);
 
+  // Detail-Cache (beschleunigt Rebuilds massiv). Nur STABILE (erschienene) Titel
+  // werden gecacht; künftige Titel werden immer neu geholt (Status ändert sich).
+  const DETAIL_CACHE = path.join(root, 'data', 'tmdb-detail-cache.json');
+  const detailCache = readJson(DETAIL_CACHE, {});
+
   // volle Angaben (future + Echtheits-/Anzeige-/Detailfelder) für Ableger/Entdeckungen.
   async function detailMeta(id, type) {
+    const ck = `${type || 'movie'}:${id}`;
+    if (!refresh && detailCache[ck]) return detailCache[ck];
     try {
+      let result;
       if (type === 'tv') {
         const d = await client.tv(id);
         // noch nicht ausgestrahlt: Datum in der Zukunft oder gar kein Ausstrahlungsdatum
         const future = isFuture(d.first_air_date) || !d.first_air_date;
-        return {
+        result = {
           future, real: tvIsReal(d), title: d.name || d.original_name, year: (d.first_air_date || '').slice(0, 4) || null, poster: d.poster_path || null,
           overview: d.overview || null, rating: rd2(d.vote_average), runtime: (d.episode_run_time || [])[0] || null, seasons: d.number_of_seasons || null, backdrop: d.backdrop_path || null, cast: castOf(d),
         };
+      } else {
+        const d = await client.movieFull(id);
+        // noch nicht erschienen: künftiges Datum ODER TMDB-Status ≠ "Released" (angekündigt)
+        const future = isFuture(d.release_date) || (!!d.status && d.status !== 'Released');
+        result = {
+          future, real: movieIsReal(d), title: d.title || d.original_title, year: (d.release_date || '').slice(0, 4) || null, poster: d.poster_path || null,
+          overview: d.overview || null, rating: rd2(d.vote_average), runtime: d.runtime || null, seasons: null, backdrop: d.backdrop_path || null, cast: castOf(d),
+        };
       }
-      const d = await client.movieFull(id);
-      // noch nicht erschienen: künftiges Datum ODER TMDB-Status ≠ "Released" (angekündigt)
-      const future = isFuture(d.release_date) || (!!d.status && d.status !== 'Released');
-      return {
-        future, real: movieIsReal(d), title: d.title || d.original_title, year: (d.release_date || '').slice(0, 4) || null, poster: d.poster_path || null,
-        overview: d.overview || null, rating: rd2(d.vote_average), runtime: d.runtime || null, seasons: null, backdrop: d.backdrop_path || null, cast: castOf(d),
-      };
+      if (!result.future) detailCache[ck] = result; // nur erschienene Titel cachen
+      return result;
     } catch (e) {
       warn(`Detail ${type || 'movie'} ${id}: ${e.message}`);
       return null;
@@ -278,5 +289,6 @@ export async function buildSeriesData({ movies, client, root, refresh = false, l
   for (const k of Object.keys(extrasOut)) if (!extrasOut[k].length) delete extrasOut[k];
 
   fs.writeFileSync(EXTRAS_PATH, JSON.stringify(extrasOut));
+  fs.writeFileSync(DETAIL_CACHE, JSON.stringify(detailCache));
   log(`✓ Zusatz-Titel für ${Object.keys(extrasOut).length} Reihen (${discovered} entdeckt, ${catAdded} Kategorie-Titel).`);
 }
