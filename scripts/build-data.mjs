@@ -42,6 +42,9 @@ const REPORT_PATH = path.join(ROOT, 'data', 'build-report.md');
 const UNMATCHED_PATH = path.join(ROOT, 'data', 'tmdb-unmatched.json');
 const MATCHES_PATH = path.join(ROOT, 'data', 'tmdb-matches.md');
 
+// data/ existiert in der CI nicht (gitignored) → für Cache/Report-Dateien anlegen.
+fs.mkdirSync(path.join(ROOT, 'data'), { recursive: true });
+
 const FLAGS = new Set(process.argv.slice(2));
 const REFRESH = FLAGS.has('--refresh');
 const REFRESH_IMAGES = FLAGS.has('--refresh-images'); // erzwingt Neu-Download vorhandener Poster

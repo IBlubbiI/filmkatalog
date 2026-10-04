@@ -90,6 +90,7 @@ export async function buildSeriesData({ movies, client, root, refresh = false, l
       return f;
     }
   };
+  fs.mkdirSync(path.join(root, 'data'), { recursive: true }); // data/ fehlt in der CI (gitignored)
   const COLLECTIONS_PATH = path.join(root, 'public', 'collections.json');
   const COLLECTIONS_CACHE = path.join(root, 'data', 'tmdb-collections-cache.json');
   const EXTRAS_PATH = path.join(root, 'public', 'collection-extras.json');
