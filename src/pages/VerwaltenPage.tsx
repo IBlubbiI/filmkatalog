@@ -79,6 +79,17 @@ export function VerwaltenPage() {
   const [form, setForm] = useState<MovieRow | null>(null);
   const [editQuery, setEditQuery] = useState('');
 
+  // WICHTIG: alle Hooks (auch dieses useMemo) VOR dem vorzeitigen Passwort-Return,
+  // sonst ändert sich die Hook-Anzahl beim Entsperren → React-Fehler / leere Ansicht.
+  const editList = useMemo(() => {
+    const q = editQuery.trim().toLowerCase();
+    const prim = [...data.groups.values()].map((g) => g[0]);
+    return prim
+      .filter((m) => !q || m.title.toLowerCase().includes(q))
+      .sort((a, b) => a.title.localeCompare(b.title, 'de'))
+      .slice(0, q ? 60 : 0);
+  }, [data.groups, editQuery]);
+
   const say = (t: 'ok' | 'err', s: string) => {
     setMsg({ t, s });
     setTimeout(() => setMsg((m) => (m?.s === s ? null : m)), 5000);
@@ -185,15 +196,6 @@ export function VerwaltenPage() {
       if (query.trim().length < 2) return;
       setHits(await admin.search(query.trim(), PW));
     });
-
-  const editList = useMemo(() => {
-    const q = editQuery.trim().toLowerCase();
-    const prim = [...data.groups.values()].map((g) => g[0]);
-    return prim
-      .filter((m) => !q || m.title.toLowerCase().includes(q))
-      .sort((a, b) => a.title.localeCompare(b.title, 'de'))
-      .slice(0, q ? 60 : 0);
-  }, [data.groups, editQuery]);
 
   return (
     <div className="mx-auto max-w-4xl px-4 pb-28">
