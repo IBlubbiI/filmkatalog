@@ -58,8 +58,11 @@ export function makeTmdbClient(key, { lang = 'de-DE' } = {}) {
     collection: (id) => get(`/collection/${id}`, { language: lang }),
     // Kino-/Digital-/Physical-Release-Termine je Land (Typ 5 = Physical = DVD/BD/4K)
     releaseDates: (id) => get(`/movie/${id}/release_dates`),
-    // Volle Filmdetails inkl. Genres, Laufzeit, Release-Termine und Besetzung
-    movieFull: (id) => get(`/movie/${id}`, { language: lang, append_to_response: 'release_dates,credits' }),
+    // Volle Filmdetails inkl. Genres, Laufzeit, Release-Termine, Besetzung, Keywords
+    movieFull: (id) => get(`/movie/${id}`, { language: lang, append_to_response: 'release_dates,credits,keywords' }),
+    // Filme nach Keyword (z. B. „marvel cinematic universe") – für vollständige Universen
+    discoverByKeyword: (keywordId, page = 1) =>
+      get('/discover/movie', { language: lang, with_keywords: keywordId, sort_by: 'primary_release_date.asc', include_adult: false, page }),
     // Deutschsprachiges Overview kann bei TMDB fehlen -> optionaler EN-Fallback
     movieEn: (id) => get(`/movie/${id}`, { language: 'en-US' }),
     tvEn: (id) => get(`/tv/${id}`, { language: 'en-US' }),

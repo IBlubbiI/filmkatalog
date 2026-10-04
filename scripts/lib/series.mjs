@@ -71,9 +71,14 @@ function subtitleSeparated(title, pref) {
   return /^\s*[:–—\-·|/]/.test(t.slice(p.length));
 }
 
-// Ist der Kandidat ein "echter" Film/Serie (kein Making-of/Kurzfilm/Doku)?
+// TMDB-Keywords, die ein Zusatz-/Special-Format markieren (kein "richtiger" Film):
+// Kurzfilm, Weihnachts-/Feiertags-Special, TV-Special.
+const SPECIAL_KW = new Set([263548, 255088, 273278, 293129, 316213]);
+const hasSpecialKw = (d) => (d.keywords?.keywords || []).some((k) => SPECIAL_KW.has(k.id));
+
+// Ist der Kandidat ein "echter" Film (kein Making-of/Kurzfilm/Doku/Special)?
 const movieIsReal = (d) =>
-  !((d.genres || []).some((g) => g.id === 99) || (d.runtime > 0 && d.runtime < 40) || isMakingOf(d.title || d.original_title));
+  !((d.genres || []).some((g) => g.id === 99) || (d.runtime > 0 && d.runtime < 40) || isMakingOf(d.title || d.original_title) || hasSpecialKw(d));
 // Doku (99), Talk (10767), News (10763), Reality (10764) raus → keine echten Serien.
 const tvIsReal = (d) => !((d.genres || []).some((g) => [99, 10767, 10763, 10764].includes(g.id)) || isMakingOf(d.name || d.original_name));
 
@@ -237,8 +242,41 @@ export async function buildSeriesData({ movies, client, root, refresh = false, l
     }
   }
 
+  // ---- 4. Kategorie-Universen vervollständigen (Marvel/DC-Hauptreihe) --------
+  //  Holt die kanonische Film-Liste je Kategorie per TMDB-Keyword, damit auch
+  //  NICHT besessene Hauptreihen-Filme (z. B. Eternals) chronologisch erscheinen.
+  //  Nur nicht besessene echte Filme (Making-ofs/One-Shots/Shorts gefiltert).
+  const CATEGORY_KEYWORD = { Marvel: 180547, DC: 229266 };
+  const ownedCategories = new Set(owned.map((m) => m.category).filter(Boolean));
+  let catAdded = 0;
+  for (const [cat, kwId] of Object.entries(CATEGORY_KEYWORD)) {
+    if (!ownedCategories.has(cat)) continue;
+    const ids = [];
+    try {
+      let page = 1, totalPages = 1;
+      do {
+        const r = await client.discoverByKeyword(kwId, page);
+        totalPages = Math.min(r.total_pages || 1, 6);
+        for (const m of r.results || []) ids.push(m.id);
+        page++;
+      } while (page <= totalPages);
+    } catch (e) {
+      warn(`Keyword-Discover ${cat} (${kwId}): ${e.message}`);
+      continue;
+    }
+    const parts = [];
+    for (const id of ids) {
+      if (ownedIds.has(id) || deny.has(id)) continue; // besessene Filme stehen schon im Katalog
+      const meta = await detailMeta(id, 'movie');
+      if (!meta || !meta.real) continue; // Making-of/One-Shot/Short/Doku raus
+      parts.push({ tmdbId: id, type: 'movie', title: meta.title, year: meta.year, poster: meta.poster, future: meta.future, ...detailFields(meta) });
+    }
+    if (parts.length) extrasOut[`cat:${cat}`] = parts;
+    catAdded += parts.length;
+  }
+
   for (const k of Object.keys(extrasOut)) if (!extrasOut[k].length) delete extrasOut[k];
 
   fs.writeFileSync(EXTRAS_PATH, JSON.stringify(extrasOut));
-  log(`✓ Zusatz-Titel für ${Object.keys(extrasOut).length} Reihen (${discovered} automatisch entdeckt).`);
+  log(`✓ Zusatz-Titel für ${Object.keys(extrasOut).length} Reihen (${discovered} entdeckt, ${catAdded} Kategorie-Titel).`);
 }

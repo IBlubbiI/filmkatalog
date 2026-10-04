@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'r
 import { Link } from 'react-router-dom';
 import { useData } from '../lib/data';
 import { PosterImage } from '../components/PosterImage';
-import { IconChevronLeft } from '../components/Icons';
+import { IconChevronLeft, IconSearch, IconClose } from '../components/Icons';
 import { formatBadges } from '../lib/format';
 import type { Movie } from '../types';
 
@@ -17,74 +17,97 @@ interface Entry {
   owned: Movie | null;
   status: Status; // owned = im Besitz · available = auf Disc erhältlich · upcoming = noch kein Disc-Release
 }
-interface Series {
+interface SubGroup {
+  label: string; // '' = keine Unterüberschrift (normale Reihe)
+  list: Entry[];
+}
+interface Section {
   key: string;
   name: string;
-  list: Entry[];
-  owned: number; // im Besitz
-  releasable: number; // im Besitz + auf Disc erhältlich (Nenner für "X von Y")
+  groups: SubGroup[];
 }
 
-function buildSeries(data: ReturnType<typeof useData>): Series[] {
-  const primaries = [...data.groups.values()].map((g) => g[0]); // je Film eine (Primär-)Ausgabe
-  // Besitz GLOBAL nach TMDB-ID (nicht nur je Reihe): ein Film, den man in einer
-  // anderen Reihe/Box besitzt, gilt auch hier als vorhanden (z. B. Hexenjäger).
-  const globalOwned = new Map<number, Movie>();
-  for (const m of primaries) if (m.tmdb?.tmdbId) globalOwned.set(m.tmdb.tmdbId, m);
-  const byKey = new Map<string, { name: string; films: Movie[] }>();
-  for (const m of primaries) {
-    const key = m.universe || m.franchise || (m.tmdb?.collection ? `col:${m.tmdb.collection.id}` : '');
-    if (!key) continue;
-    const name = m.universe || m.franchise || m.tmdb?.collection?.name || key;
-    if (!byKey.has(key)) byKey.set(key, { name, films: [] });
-    byKey.get(key)!.films.push(m);
+// --- Kategorie-Universen (Marvel/DC): Hauptstory vs. Spin-offs -----------------
+const MAIN_UNIVERSE: Record<string, string> = {
+  Marvel: 'Marvel Cinematic Universe (MCU)',
+  DC: 'DC Extended Universe (DCEU)',
+};
+const SHORT: Record<string, string> = { Marvel: 'MCU', DC: 'DCEU' };
+const CATEGORY_ORDER = ['Marvel', 'DC'];
+// Einzelne Korrekturen, wo das Reihen-Tag die Hauptstory-Zuordnung nicht trifft:
+const FORCE_MAIN = new Set(['F417']); // Aquaman: Lost Kingdom – gehört zur DCEU-Hauptreihe
+const FORCE_SPINOFF = new Set(['F415']); // Birds of Prey – Nebenstory, kein Teil der Hauptstory
+const isMainStory = (m: Movie, cat: string) =>
+  FORCE_MAIN.has(m.id) ? true : FORCE_SPINOFF.has(m.id) ? false : m.universe === MAIN_UNIVERSE[cat];
+
+/** Baut die Einträge einer Film-Menge: eigene Filme + Sammlungs-Teile (+ optional Ableger). */
+function entriesFromFilms(films: Movie[], data: ReturnType<typeof useData>, globalOwned: Map<number, Movie>, extraKeys: string[]): Entry[] {
+  const raw = new Map<string | number, { title: string; year: string | null; poster: string | null; future: boolean; owned: Movie | null }>();
+  const add = (id: string | number, title: string, year: string | null, poster: string | null, future: boolean) => {
+    if (!raw.has(id)) raw.set(id, { title, year, poster, future, owned: null });
+  };
+  const collIds = new Set(films.map((f) => f.tmdb?.collection?.id).filter(Boolean) as number[]);
+  for (const cid of collIds) for (const p of data.collections[cid]?.parts ?? []) add(p.tmdbId, p.title, p.year, p.poster, !!p.future);
+  for (const key of extraKeys) for (const ex of data.collectionExtras[key] ?? []) add(ex.tmdbId, ex.title, ex.year, ex.poster, !!ex.future);
+  // Besitz GLOBAL markieren (ein Titel kann in einer anderen Reihe besessen sein, z. B. Hexenjäger)
+  for (const [id, e] of raw) if (typeof id === 'number') e.owned = globalOwned.get(id) ?? null;
+  // eigene Filme ergänzen – auch die OHNE TMDB-Treffer (z. B. Sammelboxen)
+  for (const f of films) {
+    const id = f.tmdb?.tmdbId ?? `film:${f.id}`;
+    const ex = raw.get(id);
+    if (ex) ex.owned = f;
+    else raw.set(id, { title: f.title, year: f.year ? String(f.year) : f.yearRaw, poster: null, future: false, owned: f });
   }
-
-  const result: Series[] = [];
-  for (const [key, { name, films }] of byKey) {
-    const collIds = [...new Set(films.map((f) => f.tmdb?.collection?.id).filter(Boolean) as number[])];
-    const raw = new Map<string | number, { title: string; year: string | null; poster: string | null; future: boolean; owned: Movie | null }>();
-    const add = (id: string | number, title: string, year: string | null, poster: string | null, future: boolean) => {
-      if (!raw.has(id)) raw.set(id, { title, year, poster, future, owned: null });
-    };
-    for (const cid of collIds) {
-      for (const p of data.collections[cid]?.parts ?? []) add(p.tmdbId, p.title, p.year, p.poster, !!p.future);
-    }
-    // Ableger/Fortsetzungen (automatisch entdeckt + manuell ergänzt)
-    for (const ex of data.collectionExtras[key] ?? []) add(ex.tmdbId, ex.title, ex.year, ex.poster, !!ex.future);
-    // Besitz GLOBAL markieren (ein Titel kann in einer anderen Reihe besessen sein)
-    for (const [id, e] of raw) if (typeof id === 'number') e.owned = globalOwned.get(id) ?? null;
-    // eigene Filme dieser Reihe ergänzen – auch die OHNE TMDB-Treffer (z. B. Sammelboxen),
-    // sonst erscheinen sie fälschlich als "nicht im Besitz".
-    for (const f of films) {
-      const id = f.tmdb?.tmdbId ?? `film:${f.id}`;
-      const existing = raw.get(id);
-      if (existing) existing.owned = f;
-      else raw.set(id, { title: f.title, year: f.year ? String(f.year) : f.yearRaw, poster: null, future: false, owned: f });
-    }
-
-    const list: Entry[] = [...raw.entries()].map(([id, e]): Entry => ({
+  return [...raw.entries()]
+    .map(([id, e]): Entry => ({
       key: String(id),
       tmdbId: typeof id === 'number' ? id : null,
       title: e.title,
       year: e.year,
       poster: e.poster,
       owned: e.owned,
-      // besitze ich · schon erschienen (erhältlich) · noch nicht erschienen (angekündigt)
       status: e.owned ? 'owned' : e.future ? 'upcoming' : 'available',
-    }));
-    list.sort((a, b) => (Number(a.year) || 9999) - (Number(b.year) || 9999));
-    if (list.length < 2) continue;
-    result.push({
-      key,
-      name,
-      list,
-      owned: list.filter((e) => e.status === 'owned').length,
-      releasable: list.filter((e) => e.status !== 'upcoming').length,
-    });
+    }))
+    .sort((a, b) => (Number(a.year) || 9999) - (Number(b.year) || 9999));
+}
+
+function buildSections(data: ReturnType<typeof useData>): Section[] {
+  const primaries = [...data.groups.values()].map((g) => g[0]); // je Film eine (Primär-)Ausgabe
+  const globalOwned = new Map<number, Movie>();
+  for (const m of primaries) if (m.tmdb?.tmdbId) globalOwned.set(m.tmdb.tmdbId, m);
+
+  // 1. Kategorie-Universen (Marvel, DC) – Hauptreihe (chronologisch) + Spin-offs
+  const universes: Section[] = [];
+  for (const cat of CATEGORY_ORDER) {
+    const catFilms = primaries.filter((m) => m.category === cat);
+    if (catFilms.length < 2) continue;
+    // Hauptreihe: eigene Hauptstory-Filme + kanonische (nicht besessene) Titel aus `cat:<cat>`
+    const mainList = entriesFromFilms(catFilms.filter((m) => isMainStory(m, cat)), data, globalOwned, [`cat:${cat}`]);
+    const spinList = entriesFromFilms(catFilms.filter((m) => !isMainStory(m, cat)), data, globalOwned, []);
+    const groups: SubGroup[] = [];
+    if (mainList.length) groups.push({ label: `Hauptreihe · ${SHORT[cat]} · chronologisch`, list: mainList });
+    if (spinList.length) groups.push({ label: 'Spin-offs & weitere Filme', list: spinList });
+    if (groups.length) universes.push({ key: `cat:${cat}`, name: `${cat}-Universum`, groups });
   }
-  result.sort((a, b) => a.name.localeCompare(b.name, 'de'));
-  return result;
+
+  // 2. Normale Reihen (kategorisierte Filme sind in den Universen oben)
+  const byKey = new Map<string, { name: string; films: Movie[] }>();
+  for (const m of primaries) {
+    if (m.category) continue;
+    const key = m.universe || m.franchise || (m.tmdb?.collection ? `col:${m.tmdb.collection.id}` : '');
+    if (!key) continue;
+    const name = m.universe || m.franchise || m.tmdb?.collection?.name || key;
+    if (!byKey.has(key)) byKey.set(key, { name, films: [] });
+    byKey.get(key)!.films.push(m);
+  }
+  for (const [key, { name, films }] of byKey) {
+    const list = entriesFromFilms(films, data, globalOwned, [key]);
+    if (list.length < 2) continue;
+    universes.push({ key, name, groups: [{ label: '', list }] });
+  }
+  // Universen + Reihen gemeinsam alphabetisch (Marvel/DC bekommen keine Sonderstellung).
+  universes.sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  return universes;
 }
 
 /** Format-Badges (4K/BD/DV/DVD) über alle Ausgaben eines Films. */
@@ -126,8 +149,7 @@ function DiscoverLink({ e, children }: { e: Entry; children: ReactNode }) {
   );
 }
 
-/** Gehört zur Reihe, ist auf Disc erhältlich, aber (noch) nicht im Besitz.
- *  Deutlich abgesetzt von besessenen Titeln: entsättigt, abgedunkelt, Rahmen. */
+/** Gehört zur Reihe, ist auf Disc erhältlich, aber (noch) nicht im Besitz. */
 function AvailableCard({ e }: { e: Entry }) {
   return (
     <DiscoverLink e={e}>
@@ -162,12 +184,7 @@ function UpcomingCard({ e }: { e: Entry }) {
       <div className="opacity-70 transition hover:opacity-100" title={`${e.title}${e.year ? ` (${e.year})` : ''} – noch kein Disc-Release`}>
         <div className="relative flex aspect-[2/3] items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-ink-600 bg-ink-850">
           {e.poster && (
-            <img
-              src={`https://image.tmdb.org/t/p/w342${e.poster}`}
-              alt=""
-              loading="lazy"
-              className="absolute inset-0 h-full w-full object-cover opacity-20 grayscale"
-            />
+            <img src={`https://image.tmdb.org/t/p/w342${e.poster}`} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover opacity-20 grayscale" />
           )}
         </div>
         <p className="mt-1 truncate px-0.5 text-[11px] text-zinc-500">{e.title}</p>
@@ -177,6 +194,14 @@ function UpcomingCard({ e }: { e: Entry }) {
   );
 }
 
+function EntryCard({ e }: { e: Entry }) {
+  if (e.status === 'owned' && e.owned) return <OwnedCard m={e.owned} />;
+  if (e.status === 'available') return <AvailableCard e={e} />;
+  return <UpcomingCard e={e} />;
+}
+
+const GRID = 'grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8';
+
 type Mode = 'all' | 'owned' | 'missing';
 const MODES: { key: Mode; label: string }[] = [
   { key: 'all', label: 'Alle' },
@@ -184,37 +209,36 @@ const MODES: { key: Mode; label: string }[] = [
   { key: 'missing', label: 'Nicht im Besitz' },
 ];
 
-// Scroll-Position der Sammlung merken, damit "Zurück" (Detail → Sammlung) an der
-// gleichen Stelle weitermacht statt nach oben zu springen. Modul-Variable = bleibt
-// über das Aus-/Einhängen der Seite hinweg erhalten (pro Sitzung).
+// Scroll-Position über das Aus-/Einhängen der Seite hinweg merken (pro Sitzung).
 let savedScroll = 0;
 
-// Ansichtszustand über Seitenwechsel (z. B. Detail → Zurück) hinweg merken.
+// Ansichtszustand (Modus, Toggle, Suche) über Seitenwechsel hinweg merken.
 const VIEW_KEY = 'filmkatalog.sammlung.v1';
-function loadView(): { mode: Mode; showUpcoming: boolean } {
+function loadView(): { mode: Mode; showUpcoming: boolean; q: string } {
   try {
     const p = JSON.parse(localStorage.getItem(VIEW_KEY) || '{}');
-    return { mode: MODES.some((m) => m.key === p.mode) ? p.mode : 'all', showUpcoming: !!p.showUpcoming };
+    return { mode: MODES.some((m) => m.key === p.mode) ? p.mode : 'all', showUpcoming: !!p.showUpcoming, q: typeof p.q === 'string' ? p.q : '' };
   } catch {
-    return { mode: 'all', showUpcoming: false };
+    return { mode: 'all', showUpcoming: false, q: '' };
   }
 }
 
 export function SammlungPage() {
   const data = useData();
-  const series = useMemo(() => buildSeries(data), [data]);
-  const [mode, setMode] = useState<Mode>(() => loadView().mode);
-  const [showUpcoming, setShowUpcoming] = useState(() => loadView().showUpcoming); // angekündigte (ohne Disc-Release) per Default aus
+  const sections = useMemo(() => buildSections(data), [data]);
+  const init = loadView();
+  const [mode, setMode] = useState<Mode>(init.mode);
+  const [showUpcoming, setShowUpcoming] = useState(init.showUpcoming);
+  const [query, setQuery] = useState(init.q);
 
   useEffect(() => {
     try {
-      localStorage.setItem(VIEW_KEY, JSON.stringify({ mode, showUpcoming }));
+      localStorage.setItem(VIEW_KEY, JSON.stringify({ mode, showUpcoming, q: query }));
     } catch {
-      /* localStorage nicht verfügbar → Zustand bleibt eben nur pro Sitzung */
+      /* localStorage nicht verfügbar → nur pro Sitzung */
     }
-  }, [mode, showUpcoming]);
+  }, [mode, showUpcoming, query]);
 
-  // Scroll-Position wiederherstellen (vor dem Paint, kein Springen) + laufend merken.
   useLayoutEffect(() => {
     if (savedScroll) window.scrollTo(0, savedScroll);
     const onScroll = () => {
@@ -224,54 +248,78 @@ export function SammlungPage() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  const shown = useMemo(
-    () =>
-      series
-        .map((s) => ({
-          ...s,
-          list: s.list.filter((e) => {
-            if (e.status === 'upcoming' && !showUpcoming) return false;
-            if (mode === 'owned') return e.status === 'owned';
-            if (mode === 'missing') return e.status !== 'owned';
-            return true;
-          }),
-        }))
-        .filter((s) => s.list.length > 0),
-    [series, mode, showUpcoming],
-  );
+  const q = query.trim().toLowerCase();
+  const keepEntry = (e: Entry) => {
+    if (e.status === 'upcoming' && !showUpcoming) return false;
+    if (mode === 'owned') return e.status === 'owned';
+    if (mode === 'missing') return e.status !== 'owned';
+    return true;
+  };
 
-  // Alle besessenen Filme, die in KEINER Reihe erscheinen → unten als Einzeltitel.
+  const shown = useMemo(() => {
+    return sections
+      .map((s) => {
+        const nameMatch = !!q && s.name.toLowerCase().includes(q);
+        const groups = s.groups
+          .map((g) => ({ label: g.label, list: g.list.filter((e) => (!q || nameMatch || e.title.toLowerCase().includes(q)) && keepEntry(e)) }))
+          .filter((g) => g.list.length > 0);
+        return { ...s, groups };
+      })
+      .filter((s) => s.groups.length > 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sections, mode, showUpcoming, q]);
+
+  // Besessene Filme, die in KEINER Sektion erscheinen → unten als Einzeltitel.
   const standalone = useMemo(() => {
-    const inSeries = new Set<string>();
-    for (const s of series) for (const e of s.list) if (e.owned) inSeries.add(e.owned.id);
+    const inSection = new Set<string>();
+    for (const s of sections) for (const g of s.groups) for (const e of g.list) if (e.owned) inSection.add(e.owned.id);
     return [...data.groups.values()]
       .map((g) => g[0])
-      .filter((m) => !inSeries.has(m.id))
+      .filter((m) => !inSection.has(m.id))
       .sort((a, b) => a.title.localeCompare(b.title, 'de'));
-  }, [series, data.groups]);
-  const showStandalone = mode !== 'missing' && standalone.length > 0;
+  }, [sections, data.groups]);
+  const standaloneShown = mode === 'missing' ? [] : standalone.filter((m) => !q || m.title.toLowerCase().includes(q));
+
+  const counts = (s: Section) => {
+    const all = s.groups.flatMap((g) => g.list);
+    return { owned: all.filter((e) => e.status === 'owned').length, releasable: all.filter((e) => e.status !== 'upcoming').length };
+  };
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16">
-      <header className="sticky top-0 z-10 -mx-4 flex items-center justify-between gap-2 bg-ink-900/90 px-4 py-3 backdrop-blur-md">
-        <div className="flex items-center gap-2">
-          <Link to="/" className="inline-flex items-center gap-1 rounded-full bg-ink-800 py-1.5 pl-2 pr-3 text-sm hover:bg-ink-700">
-            <IconChevronLeft width={18} height={18} /> Katalog
-          </Link>
-          <h1 className="text-lg font-bold">Sammlung</h1>
+      <header className="sticky top-0 z-10 -mx-4 bg-ink-900/90 px-4 pb-2 pt-3 backdrop-blur-md">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Link to="/" className="inline-flex items-center gap-1 rounded-full bg-ink-800 py-1.5 pl-2 pr-3 text-sm hover:bg-ink-700">
+              <IconChevronLeft width={18} height={18} /> Katalog
+            </Link>
+            <h1 className="text-lg font-bold">Sammlung</h1>
+          </div>
+          <span className="text-[11px] text-zinc-500">{sections.length} Reihen</span>
         </div>
-        <span className="text-[11px] text-zinc-500">{series.length} Reihen</span>
-      </header>
-
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <div className="flex flex-1 rounded-lg border border-ink-700 bg-ink-800 p-0.5 text-sm">
+        <div className="relative">
+          <IconSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            type="search"
+            enterKeyHint="search"
+            placeholder="Reihe oder Titel suchen… (z. B. Marvel, Maze Runner)"
+            className="w-full rounded-xl border border-ink-700 bg-ink-800 py-2 pl-10 pr-9 text-sm placeholder:text-zinc-600 focus:border-accent/60"
+          />
+          {query && (
+            <button onClick={() => setQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-zinc-500 hover:bg-ink-700" aria-label="Suche löschen">
+              <IconClose width={16} height={16} />
+            </button>
+          )}
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className="flex flex-1 rounded-lg border border-ink-700 bg-ink-800 p-0.5 text-sm">
           {MODES.map((m) => (
             <button
               key={m.key}
               onClick={() => setMode(m.key)}
-              className={`flex-1 whitespace-nowrap rounded-md px-3 py-1.5 font-medium transition-colors ${
-                mode === m.key ? 'bg-ink-700 text-accent-soft' : 'text-zinc-400 hover:text-zinc-200'
-              }`}
+              className={`flex-1 whitespace-nowrap rounded-md px-3 py-1.5 font-medium transition-colors ${mode === m.key ? 'bg-ink-700 text-accent-soft' : 'text-zinc-400 hover:text-zinc-200'}`}
             >
               {m.label}
             </button>
@@ -281,51 +329,53 @@ export function SammlungPage() {
           onClick={() => setShowUpcoming((v) => !v)}
           aria-pressed={showUpcoming}
           title="Filme, für die noch kein DVD/Blu-ray/4K-Release feststeht"
-          className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-            showUpcoming ? 'border-accent/50 bg-ink-800 text-accent-soft' : 'border-ink-700 bg-ink-800 text-zinc-400 hover:text-zinc-200'
-          }`}
+          className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${showUpcoming ? 'border-accent/50 bg-ink-800 text-accent-soft' : 'border-ink-700 bg-ink-800 text-zinc-400 hover:text-zinc-200'}`}
         >
           <span className={`h-2 w-2 rounded-full ${showUpcoming ? 'bg-accent' : 'bg-zinc-600'}`} />
           Ohne Disc-Release
         </button>
-      </div>
+        </div>
+      </header>
 
       {data.loading ? (
         <p className="py-16 text-center text-zinc-500">Lädt…</p>
-      ) : shown.length === 0 && !showStandalone ? (
+      ) : shown.length === 0 && standaloneShown.length === 0 ? (
         <p className="py-16 text-center text-zinc-500">Keine Titel gefunden.</p>
       ) : (
         <div className="mt-4 space-y-8">
-          {shown.map((s) => (
-            <section key={s.key}>
-              <div className="mb-2 flex items-baseline justify-between">
-                <h2 className="text-sm font-semibold text-zinc-100">{s.name}</h2>
-                <span className="text-[11px] text-zinc-500">
-                  {s.owned} von {s.releasable}
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
-                {s.list.map((e) =>
-                  e.status === 'owned' && e.owned ? (
-                    <OwnedCard key={e.key} m={e.owned} />
-                  ) : e.status === 'available' ? (
-                    <AvailableCard key={e.key} e={e} />
-                  ) : (
-                    <UpcomingCard key={e.key} e={e} />
-                  ),
-                )}
-              </div>
-            </section>
-          ))}
+          {shown.map((s) => {
+            const c = counts(s);
+            const universe = s.key.startsWith('cat:');
+            return (
+              <section key={s.key}>
+                <div className="mb-2 flex items-baseline justify-between">
+                  <h2 className={`font-semibold text-zinc-100 ${universe ? 'text-base' : 'text-sm'}`}>{s.name}</h2>
+                  <span className="text-[11px] text-zinc-500">
+                    {c.owned} von {c.releasable}
+                  </span>
+                </div>
+                {s.groups.map((g, i) => (
+                  <div key={i} className={i > 0 ? 'mt-4' : ''}>
+                    {g.label && <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{g.label}</h3>}
+                    <div className={GRID}>
+                      {g.list.map((e) => (
+                        <EntryCard key={e.key} e={e} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </section>
+            );
+          })}
 
-          {showStandalone && (
+          {standaloneShown.length > 0 && (
             <section>
               <div className="mb-2 flex items-baseline justify-between border-t border-ink-800 pt-6">
                 <h2 className="text-sm font-semibold text-zinc-100">Einzeltitel</h2>
-                <span className="text-[11px] text-zinc-500">{standalone.length} ohne Reihe</span>
+                <span className="text-[11px] text-zinc-500">{standaloneShown.length} ohne Reihe</span>
               </div>
-              <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
-                {standalone.map((m) => (
+              <div className={GRID}>
+                {standaloneShown.map((m) => (
                   <OwnedCard key={m.id} m={m} />
                 ))}
               </div>

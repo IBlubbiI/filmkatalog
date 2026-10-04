@@ -27,6 +27,7 @@ import * as XLSX from 'xlsx';
 import { universeOf } from './lib/universe-map.mjs';
 import { canonicalLabel } from './lib/label-map.mjs';
 import { buildSeriesData } from './lib/series.mjs';
+import { supabaseConfigured, fetchMoviesFromSupabase } from './lib/source-supabase.mjs';
 import { makeTmdbClient, downloadImage } from './lib/tmdb.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -126,20 +127,26 @@ const slug = (s) =>
     .replace(/^-+|-+$/g, '');
 
 // ---------------------------------------------------------------------------
-//  1. Excel lesen
+//  1. Quelle lesen: Supabase (wenn konfiguriert) sonst Excel
 // ---------------------------------------------------------------------------
-if (!fs.existsSync(XLSX_PATH)) {
-  console.error(`\n✖ Excel nicht gefunden: ${XLSX_PATH}`);
-  console.error('  Lege data/Filmsammlung.xlsx an (siehe README) und starte erneut.\n');
-  process.exit(1);
+let rows;
+if (supabaseConfigured()) {
+  rows = await fetchMoviesFromSupabase();
+  log(`\n📖 ${rows.length} Filme aus Supabase gelesen.`);
+} else {
+  if (!fs.existsSync(XLSX_PATH)) {
+    console.error(`\n✖ Weder SUPABASE_URL gesetzt noch Excel gefunden: ${XLSX_PATH}`);
+    console.error('  Lege data/Filmsammlung.xlsx an (siehe README) oder setze SUPABASE_URL/SUPABASE_ANON_KEY.\n');
+    process.exit(1);
+  }
+  const wb = XLSX.read(fs.readFileSync(XLSX_PATH), { type: 'buffer' });
+  if (!wb.SheetNames.includes(SHEET)) {
+    console.error(`\n✖ Sheet "${SHEET}" nicht gefunden. Vorhanden: ${wb.SheetNames.join(', ')}\n`);
+    process.exit(1);
+  }
+  rows = XLSX.utils.sheet_to_json(wb.Sheets[SHEET], { defval: null, raw: true });
+  log(`\n📖 ${rows.length} Zeilen aus "${SHEET}" gelesen.`);
 }
-const wb = XLSX.read(fs.readFileSync(XLSX_PATH), { type: 'buffer' });
-if (!wb.SheetNames.includes(SHEET)) {
-  console.error(`\n✖ Sheet "${SHEET}" nicht gefunden. Vorhanden: ${wb.SheetNames.join(', ')}\n`);
-  process.exit(1);
-}
-const rows = XLSX.utils.sheet_to_json(wb.Sheets[SHEET], { defval: null, raw: true });
-log(`\n📖 ${rows.length} Zeilen aus "${SHEET}" gelesen.`);
 
 // ---------------------------------------------------------------------------
 //  2. Konsistenzprüfung – bei Fehlern Abbruch, damit keine kaputte JSON entsteht
@@ -475,8 +482,20 @@ if (NO_TMDB || !TMDB_KEY) {
       continue;
     }
     const cached = cache[m.id];
-    // Cache nutzen, außer --refresh oder bisher erfolglos
-    if (!REFRESH && !override && cached && cached.matched) {
+    // Cache nur nutzen, wenn der gespeicherte Treffer noch zum aktuellen Titel passt.
+    // Schützt davor, dass nach ID-Umnummerierung in der Excel ein veralteter
+    // (verschobener) Treffer verwendet wird -> ID zeigt dann auf den falschen Film.
+    const cacheFits = (() => {
+      if (!cached || !cached.matched) return false;
+      const n = (s) => (s || '').toLowerCase().replace(/[^a-z0-9äöüß]/gi, '');
+      const b = n(cached.matchedTitle);
+      if (!b) return true; // kein Titel gespeichert -> nicht verwerfen
+      const a = n(m.title), ob = n(m.originalTitle);
+      if (a.includes(b) || b.includes(a) || (ob && (ob.includes(b) || b.includes(ob)))) return true;
+      return !!(cached.matchedYear && m.year && Number(cached.matchedYear) === Number(m.year));
+    })();
+    // Cache nutzen, außer --refresh, Override, bisher erfolglos oder Titel passt nicht mehr
+    if (!REFRESH && !override && cached && cached.matched && cacheFits) {
       m.tmdb = {
         tmdbId: cached.tmdbId, rating: cached.rating, votes: cached.votes,
         overview: cached.overview, poster: cached.poster, backdrop: cached.backdrop,

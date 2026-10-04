@@ -10,3 +10,6 @@ data/
 
 # Die fertige App-Daten (public/movies.json + public/posters/) WERDEN eingecheckt,
 # damit die Online-App ohne TMDB-Key gebaut werden kann. -> daher NICHT ignoriert.
+
+# Einmaliger Supabase-Daten-Dump (regenerierbar, nicht ins Repo)
+supabase/setup.sql

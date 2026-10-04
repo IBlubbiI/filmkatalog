@@ -1,0 +1,51 @@
+name: Sammlung aus Supabase bauen & deployen
+
+# Baut movies.json/Poster/Collections aus der Supabase-Datenbank und committet sie.
+# Der Commit auf main stößt den bestehenden Pages-Deploy (deploy.yml) an.
+#
+# Auslöser:
+#   - manuell (Actions → Run workflow)
+#   - per API: repository_dispatch { "event_type": "rebuild" }  (später aus der App)
+#
+# Benötigte Repo-Secrets (Settings → Secrets and variables → Actions):
+#   SUPABASE_URL, SUPABASE_ANON_KEY, TMDB_API_KEY
+
+on:
+  workflow_dispatch: {}
+  repository_dispatch:
+    types: [rebuild]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rebuild-deploy
+  cancel-in-progress: false
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: movies.json + Poster + Collections aus Supabase bauen
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: npm run build:data
+      - name: Änderungen committen (stößt Deploy an)
+        run: |
+          if git diff --quiet -- public/; then
+            echo "Keine Änderungen an den Sammlung-Daten."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/
+          git commit -m "chore: Sammlung aus Supabase aktualisiert"
+          git push
