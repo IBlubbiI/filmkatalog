@@ -108,6 +108,41 @@ Deno.serve(async (req) => {
         });
       }
 
+      case 'scan': {
+        const gkey = Deno.env.get('GEMINI_API_KEY');
+        if (!gkey) return json({ error: 'GEMINI_API_KEY nicht gesetzt' }, 500);
+        const model = Deno.env.get('GEMINI_MODEL') || 'gemini-2.0-flash';
+        const prompt =
+          'Du erhältst ein Foto der Rückseite (oder Vorderseite) einer Film-Disc (DVD/Blu-ray/4K UHD). ' +
+          'Lies alle erkennbaren Angaben aus und gib NUR ein JSON-Objekt mit genau diesen Schlüsseln zurück ' +
+          '(Werte, die nicht erkennbar sind, als leeren String ""): ' +
+          'title_de, title_original, year, director, disc_format, discs, native_4k, hdr, atmos, aspect_ratio, ' +
+          'fsk, runtime_min, label, edition, ean, audio_ov, audio_de, subtitles_de, genre, bonus. ' +
+          'Regeln: disc_format z.B. "4K UHD + Blu-ray" oder "Blu-ray"; native_4k und atmos jeweils "Ja" oder "Nein"; ' +
+          'hdr z.B. "Dolby Vision, HDR10"; aspect_ratio z.B. "2.39:1"; year als vierstellige Zahl; ' +
+          'runtime_min als Zahl (Minuten); ean nur Ziffern; audio_ov = beste Original-Tonspur, audio_de = beste deutsche Tonspur; ' +
+          'genre als kommagetrennte Liste. Antworte ausschließlich mit dem JSON.';
+        const gbody = {
+          contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: body.mime || 'image/jpeg', data: body.image } }] }],
+          generationConfig: { responseMimeType: 'application/json', temperature: 0 },
+        };
+        const gr = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${gkey}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(gbody),
+        });
+        const gd = await gr.json();
+        if (!gr.ok) return json({ error: `Gemini ${gr.status}: ${JSON.stringify(gd).slice(0, 300)}` }, 500);
+        const text = gd.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+        let fields: Record<string, unknown> = {};
+        try {
+          fields = JSON.parse(text);
+        } catch {
+          fields = {};
+        }
+        return json({ fields });
+      }
+
       case 'upsert': {
         const movie = body.movie || {};
         if (!movie.id) movie.id = await nextId();

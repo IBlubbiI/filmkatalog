@@ -68,6 +68,29 @@ const GROUPS: { group: string; items: Field[] }[] = [
 const PW_KEY = 'filmkatalog.admin.pw';
 const IMG = (p: string | null) => (p ? `https://image.tmdb.org/t/p/w154${p}` : null);
 
+// Foto clientseitig verkleinern (spart Upload + beschleunigt den Scan) → Base64.
+async function scaledBase64(file: File, maxDim = 1600): Promise<{ data: string; mime: string }> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = () => rej(new Error('Bild konnte nicht geladen werden'));
+      i.src = url;
+    });
+    const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+    const w = Math.max(1, Math.round(img.width * scale));
+    const h = Math.max(1, Math.round(img.height * scale));
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    c.getContext('2d')!.drawImage(img, 0, 0, w, h);
+    return { data: c.toDataURL('image/jpeg', 0.85).split(',')[1], mime: 'image/jpeg' };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export function VerwaltenPage() {
   const data = useData();
   const [pw, setPw] = useState<string>(() => sessionStorage.getItem(PW_KEY) || '');
@@ -84,6 +107,7 @@ export function VerwaltenPage() {
   const [suggestions, setSuggestions] = useState<Record<string, string[]>>({});
   const [sp] = useSearchParams();
   const autoDone = useRef(false);
+  const scanInput = useRef<HTMLInputElement>(null);
 
   // Bestehende Feldwerte für Vorschlagslisten laden (öffentlich lesbar, kein Passwort).
   useEffect(() => {
@@ -251,6 +275,16 @@ export function VerwaltenPage() {
       setHits(await admin.search(query.trim(), PW));
     });
 
+  const onScan = (file: File) =>
+    run(async () => {
+      const img = await scaledBase64(file);
+      const [fields, id] = await Promise.all([admin.scan(img.data, img.mime, PW), admin.nextId(PW)]);
+      const f = fields as MovieRow;
+      setForm({ ...f, id, type: (typeof f.type === 'string' && f.type) || 'Film' });
+      setHits([]);
+      say('ok', 'Felder aus dem Foto übernommen – bitte prüfen/ergänzen und ggf. per TMDB-Suche das Poster zuordnen.');
+    });
+
   return (
     <div className="mx-auto max-w-4xl px-4 pb-28">
       <header className="sticky top-0 z-10 -mx-4 flex items-center justify-between gap-2 bg-ink-900/90 px-4 py-3 backdrop-blur-md">
@@ -294,6 +328,28 @@ export function VerwaltenPage() {
             <button onClick={search} disabled={busy} className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-lg bg-ink-700 px-3 py-1.5 text-xs font-medium hover:bg-ink-600 disabled:opacity-50">
               Suchen
             </button>
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              onClick={() => scanInput.current?.click()}
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-ink-700 bg-ink-800 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-ink-700 disabled:opacity-50"
+            >
+              📷 Rückseite scannen
+            </button>
+            <span className="text-[11px] text-zinc-600">Foto aufnehmen/hochladen → Felder automatisch vorausfüllen</span>
+            <input
+              ref={scanInput}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) onScan(file);
+                e.target.value = '';
+              }}
+            />
           </div>
           <div className="mt-3 space-y-2">
             {hits.map((h) => (
