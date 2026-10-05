@@ -43,7 +43,7 @@ const isMainStory = (m: Movie, cat: string) =>
 
 // Flache Reihen (Regisseur-/Autoren-Reihen): keine Haupt-/Spin-off-Trennung.
 // Muss zu SERIES_FLAT in scripts/lib/series-extras.mjs passen.
-const FLAT_KEYS = new Set(['Christopher Nolan', 'Astrid Lindgren']);
+const FLAT_KEYS = new Set(['Christopher Nolan', 'Quentin Tarantino', 'Astrid Lindgren', 'Märchenfilme']);
 
 /** Baut die Einträge einer Film-Menge: eigene Filme + Sammlungs-Teile (+ optional Ableger). */
 function entriesFromFilms(films: Movie[], data: ReturnType<typeof useData>, globalOwned: Map<number, Movie>, extraKeys: string[]): Entry[] {

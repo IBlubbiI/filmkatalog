@@ -19,9 +19,11 @@ export const UNIVERSE_MAP = {
   // (sonst zeigt die Sammlung "DC Extended Universe" und "… (DCEU)" getrennt).
   'DC Extended Universe': 'DC Extended Universe (DCEU)',
 
-  // Tarantino: die Box-Varianten zu EINER Reihe zusammenfassen.
-  'Tarantino XX / Kill Bill': 'Tarantino XX',
-  'Tarantino XX / Grindhouse': 'Tarantino XX',
+  // Quentin Tarantino: alle Filme des Regisseurs zu EINER (flachen) Reihe – egal
+  // ob aus der „Tarantino XX"-Box oder einzeln.
+  'Tarantino XX': 'Quentin Tarantino',
+  'Tarantino XX / Kill Bill': 'Quentin Tarantino',
+  'Tarantino XX / Grindhouse': 'Quentin Tarantino',
 
   // Drachenzähmen: Live-Action + Animationsfilme unter einer Reihe führen.
   'Drachenzähmen leicht gemacht (Live-Action)': 'Drachenzähmen leicht gemacht',
@@ -39,9 +41,9 @@ export const UNIVERSE_MAP = {
 // oder uneinheitlich ist (Datenlücken). ID gewinnt vor dem Franchise-Mapping.
 export const UNIVERSE_BY_ID = {
   F318: 'Märchenfilme', // Drei Haselnüsse für Aschenbrödel (ohne Franchise)
-  // Django & Hateful 8 gehören für den Nutzer zur Tarantino-Reihe (Franchise leer):
-  F017: 'Tarantino XX',
-  F018: 'Tarantino XX',
+  // Django & Hateful 8 gehören zur Quentin-Tarantino-Reihe (Franchise leer):
+  F017: 'Quentin Tarantino',
+  F018: 'Quentin Tarantino',
   // Augsburger Puppenkiste (Franchise teils leer):
   F353: 'Augsburger Puppenkiste',
   F354: 'Augsburger Puppenkiste',

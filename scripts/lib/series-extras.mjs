@@ -119,7 +119,9 @@ export const SERIES_MAIN = new Set([
 // gleichwertig, z. B. Regisseur-/Autoren-Reihen. Schlüssel = universe/franchise-Wert.
 export const SERIES_FLAT = new Set([
   'Christopher Nolan', // Regisseur-Reihe
+  'Quentin Tarantino', // Regisseur-Reihe
   'Astrid Lindgren', // Autoren-Reihe (Buchverfilmungen)
+  'Märchenfilme', // Sammel-Reihe gleichwertiger Märchenverfilmungen
 ]);
 
 // TMDB-Collection-IDs, die NICHT als Reihe dargestellt werden (Filme werden Einzeltitel).
