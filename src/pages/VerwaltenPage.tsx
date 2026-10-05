@@ -106,6 +106,7 @@ export function VerwaltenPage() {
   const [form, setForm] = useState<MovieRow | null>(null);
   const [editQuery, setEditQuery] = useState('');
   const [suggestions, setSuggestions] = useState<Record<string, string[]>>({});
+  const [undo, setUndo] = useState<MovieRow | null>(null);
   const [sp] = useSearchParams();
   const navigate = useNavigate();
   const autoDone = useRef(false);
@@ -246,7 +247,7 @@ export function VerwaltenPage() {
       const row = await fetchRow(id);
       if (!row) throw new Error('Datensatz nicht gefunden');
       setForm(row);
-      setTab('add'); // gleiches Formular
+      setTab('edit'); // beim Schließen zurück in die Bearbeiten-Liste
       window.scrollTo(0, 0);
     });
 
@@ -260,9 +261,20 @@ export function VerwaltenPage() {
 
   const del = (id: string, title: string) =>
     run(async () => {
-      if (!confirm(`„${title}" (${id}) wirklich entfernen?`)) return;
+      if (!confirm(`„${title}" (${id}) entfernen?`)) return;
+      const row = await fetchRow(id); // für „Rückgängig" aufbewahren
       await admin.remove(id, PW);
-      say('ok', `„${title}" entfernt. Zum Live-Schalten „Veröffentlichen".`);
+      setUndo(row);
+      say('ok', `„${title}" entfernt.`);
+    });
+
+  const doUndo = () =>
+    run(async () => {
+      if (!undo) return;
+      const t = String(undo.title_de ?? '');
+      await admin.upsert(undo, PW);
+      setUndo(null);
+      say('ok', `„${t}" wiederhergestellt.`);
     });
 
   const publish = () =>
@@ -292,7 +304,7 @@ export function VerwaltenPage() {
       <header className="sticky top-0 z-10 -mx-4 flex items-center justify-between gap-2 bg-ink-900/90 px-4 py-3 backdrop-blur-md">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/'))}
+            onClick={() => (form ? setForm(null) : window.history.length > 1 ? navigate(-1) : navigate('/'))}
             className="inline-flex items-center gap-1 rounded-full bg-ink-800 py-1.5 pl-2 pr-3 text-sm hover:bg-ink-700"
           >
             <IconChevronLeft width={18} height={18} /> Zurück
@@ -309,6 +321,15 @@ export function VerwaltenPage() {
 
       {msg && (
         <div className={`mt-3 rounded-lg px-3 py-2 text-sm ${msg.t === 'ok' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-red-500/15 text-red-300'}`}>{msg.s}</div>
+      )}
+
+      {undo && (
+        <div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-amber-500/15 px-3 py-2 text-sm text-amber-200">
+          <span className="min-w-0 truncate">„{String(undo.title_de ?? '')}" entfernt – noch nicht veröffentlicht.</span>
+          <button onClick={doUndo} disabled={busy} className="shrink-0 rounded-md bg-amber-500/25 px-2.5 py-1 text-xs font-semibold hover:bg-amber-500/35 disabled:opacity-50">
+            Rückgängig
+          </button>
+        </div>
       )}
 
       {!form && (
