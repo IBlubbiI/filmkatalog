@@ -41,11 +41,9 @@ const FORCE_SPINOFF = new Set(['F415']); // Birds of Prey – Nebenstory, kein T
 const isMainStory = (m: Movie, cat: string) =>
   FORCE_MAIN.has(m.id) ? true : FORCE_SPINOFF.has(m.id) ? false : m.universe === MAIN_UNIVERSE[cat];
 
-// Normale Reihen: besessene/Collection-Filme, die bewusst zu den Spin-offs gehören
-// (kein Teil der nummerierten Hauptreihe). Schlüssel = TMDB-ID.
-const FORCE_SPINOFF_TMDB = new Set<number>([
-  330459, // Rogue One: A Star Wars Story – Anthology-Film, nicht Teil der Skywalker-Saga
-]);
+// Flache Reihen (Regisseur-/Autoren-Reihen): keine Haupt-/Spin-off-Trennung.
+// Muss zu SERIES_FLAT in scripts/lib/series-extras.mjs passen.
+const FLAT_KEYS = new Set(['Christopher Nolan', 'Astrid Lindgren']);
 
 /** Baut die Einträge einer Film-Menge: eigene Filme + Sammlungs-Teile (+ optional Ableger). */
 function entriesFromFilms(films: Movie[], data: ReturnType<typeof useData>, globalOwned: Map<number, Movie>, extraKeys: string[]): Entry[] {
@@ -125,12 +123,38 @@ function buildSections(data: ReturnType<typeof useData>): Section[] {
   for (const [key, { name, films }] of byKey) {
     const list = entriesFromFilms(films, data, globalOwned, [key]);
     if (list.length < 2) continue;
-    // Hauptreihe (Collection-Filme + eigene + als Hauptreihe markierte Extras) vs.
-    // Spin-offs (Ableger/Serien aus den Extras ohne `main`-Flag).
-    const spinIds = new Set((data.collectionExtras[key] ?? []).filter((p) => !p.main).map((p) => p.tmdbId));
-    for (const id of FORCE_SPINOFF_TMDB) spinIds.add(id);
-    const main = list.filter((e) => !(e.tmdbId != null && spinIds.has(e.tmdbId)));
-    const spin = list.filter((e) => e.tmdbId != null && spinIds.has(e.tmdbId));
+
+    // Regisseur-/Autoren-Reihen: flach, keine Trennung.
+    if (FLAT_KEYS.has(key)) {
+      universes.push({ key, name, groups: [{ label: '', list }] });
+      continue;
+    }
+
+    // HAUPTREIHE = die offizielle TMDB-Filmreihe (= größte Collection dieser Reihe).
+    // Das ist unabhängig davon, was man besitzt, und trennt automatisch Ableger/
+    // Reboots/Anthology-Filme (eigene oder gar keine Collection) als Spin-offs ab.
+    const colSizes = new Map<number, number>();
+    for (const f of films) {
+      const cid = f.tmdb?.collection?.id;
+      if (cid != null) colSizes.set(cid, data.collections[cid]?.parts?.length ?? 0);
+    }
+    let primaryCol: number | null = null;
+    let best = -1;
+    for (const [cid, size] of colSizes) if (size > best) ((best = size), (primaryCol = cid));
+
+    const mainIds = new Set<number>();
+    if (primaryCol != null) {
+      for (const p of data.collections[primaryCol]?.parts ?? []) mainIds.add(p.tmdbId);
+    } else {
+      // Keine Film-Collection (z. B. reine Serien-Reihe) → eigene Filme = Hauptreihe.
+      for (const f of films) if (f.tmdb?.tmdbId) mainIds.add(f.tmdb.tmdbId);
+    }
+    // Redaktionelle Ausnahmen (SERIES_MAIN): Titel, die TMDB nicht zur Saga zählt.
+    for (const p of data.collectionExtras[key] ?? []) if (p.main) mainIds.add(p.tmdbId);
+
+    // Eigene Filme ohne TMDB-Treffer (z. B. Boxen) bleiben in der Hauptreihe.
+    const main = list.filter((e) => e.tmdbId == null || mainIds.has(e.tmdbId));
+    const spin = list.filter((e) => e.tmdbId != null && !mainIds.has(e.tmdbId));
     const groups =
       main.length && spin.length
         ? [

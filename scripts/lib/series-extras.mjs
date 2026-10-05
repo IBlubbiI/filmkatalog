@@ -104,17 +104,15 @@ export const SERIES_NO_DISCOVERY = new Set([
   'col:645678', // Hänsel & Gretel – zufälliger Namensstamm, unzusammenhängende Trash-Filme
 ]);
 
-// Extra-Titel, die trotz „Extra"-Herkunft zur HAUPTREIHE gehören (fortlaufende Story),
-// nicht zu den Spin-offs. Schlüssel = TMDB-ID.
+// HAUPTREIHE wird normalerweise automatisch aus der offiziellen TMDB-Filmreihe
+// (größte Collection der Reihe) bestimmt. Diese Liste ist NUR für die wenigen
+// Fälle, in denen TMDB inhaltlich anders entscheidet als gewünscht – vor allem
+// Serien (können nicht in einer Film-Collection stehen) und Titel, die TMDB nicht
+// zur Saga zählt, der Nutzer aber schon. Schlüssel = TMDB-ID.
 export const SERIES_MAIN = new Set([
-  33907, // Downton Abbey (Serie) – Beginn der durchgehenden Geschichte
-  1289936, // Downton Abbey: Das große Finale
-  474350, // Es Kapitel 2 – direkte Fortsetzung von „Es"
-  479455, // Men in Black – International – offiziell Teil 4
-  259909, // Dexter: Wiedererwachen (Resurrection) – Fortsetzung von New Blood
-  138843, // Conjuring – Die Heimsuchung (Teil 1)
-  423108, // Conjuring 3
-  1038392, // Conjuring 4: Das letzte Kapitel
+  479455, // Men in Black – International – offiziell Teil 4 (TMDB führt ihn separat)
+  33907, // Downton Abbey (Serie) – Beginn der durchgehenden Geschichte (Serie)
+  259909, // Dexter: Wiedererwachen (Resurrection) – Fortsetzung von New Blood (Serie)
 ]);
 
 // Reihen, die FLACH dargestellt werden (keine Haupt-/Spin-off-Trennung) – alle Filme
