@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import 'dotenv/config';
 import { makeTmdbClient } from './lib/tmdb.mjs';
 import { buildSeriesData } from './lib/series.mjs';
+import { buildPeopleData } from './lib/people.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MOVIES = path.join(ROOT, 'public', 'movies.json');
@@ -44,3 +45,14 @@ await buildSeriesData({
   warn: (...a) => console.warn('  ⚠ ', ...a),
 });
 console.log('✅ collections.json + collection-extras.json aktualisiert.');
+
+// Darsteller-Stammdaten (people.json) mit auffrischen. refresh=false → nur neue
+// Personen werden geholt, bekannte kommen aus dem Cache (schneller CI-Lauf).
+await buildPeopleData({
+  movies,
+  client,
+  root: ROOT,
+  refresh: false,
+  log: (...a) => console.log(...a),
+  warn: (...a) => console.warn('  ⚠ ', ...a),
+});

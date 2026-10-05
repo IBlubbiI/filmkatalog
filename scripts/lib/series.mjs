@@ -99,7 +99,7 @@ export async function buildSeriesData({ movies, client, root, refresh = false, l
 
   // TMDB-Infos für die Entdecken-Detailseite (nicht besessene Titel).
   const castOf = (d) =>
-    (d.credits?.cast || []).slice(0, 8).map((c) => ({ name: c.name, character: c.character || null, profile: c.profile_path || null }));
+    (d.credits?.cast || []).slice(0, 8).map((c) => ({ id: c.id, name: c.name, character: c.character || null, profile: c.profile_path || null }));
   const rd2 = (v) => (typeof v === 'number' && v > 0 ? Math.round(v * 10) / 10 : null);
 
   // Detail-Cache (beschleunigt Rebuilds massiv). Nur STABILE (erschienene) Titel

@@ -27,6 +27,7 @@ import * as XLSX from 'xlsx';
 import { universeOf } from './lib/universe-map.mjs';
 import { canonicalLabel } from './lib/label-map.mjs';
 import { buildSeriesData } from './lib/series.mjs';
+import { buildPeopleData } from './lib/people.mjs';
 import { supabaseConfigured, fetchMoviesFromSupabase } from './lib/source-supabase.mjs';
 import { makeTmdbClient, downloadImage } from './lib/tmdb.mjs';
 
@@ -438,7 +439,7 @@ async function enrichFromTmdb(client, movie, tmdbId, isTv, score, source, poster
   // Wichtigste Darsteller (Top 8)
   const cast = (det.credits?.cast || [])
     .slice(0, 8)
-    .map((c) => ({ name: c.name, character: c.character || null, profile: c.profile_path || null }));
+    .map((c) => ({ id: c.id, name: c.name, character: c.character || null, profile: c.profile_path || null }));
   // TMDB-Sammlung (nur Filme) – für die "Sammlung"-Ansicht mit Platzhaltern
   const collection = det.belongs_to_collection
     ? { id: det.belongs_to_collection.id, name: det.belongs_to_collection.name }
@@ -542,6 +543,10 @@ if (NO_TMDB || !TMDB_KEY) {
   // Sammlung-Ansicht: Filmreihen + Ableger + Disc-Release-Status (eigenes Modul,
   // damit derselbe Schritt auch in der CI aus public/movies.json laufen kann)
   await buildSeriesData({ movies, client, root: ROOT, refresh: REFRESH, log, warn });
+
+  // Darsteller-Stammdaten fürs Cast-Popup (nach der Sammlung, da auch Entdeckungs-
+  // Casts einfließen). Liest public/collections.json + collection-extras.json.
+  await buildPeopleData({ movies, client, root: ROOT, refresh: REFRESH, log, warn });
 }
 
 // ---------------------------------------------------------------------------

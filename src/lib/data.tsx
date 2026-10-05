@@ -12,6 +12,18 @@ export interface DiscoverCast {
   character: string | null;
   profile: string | null;
 }
+
+// Darsteller-Stammdaten (public/people.json), Schlüssel = TMDB-Personen-ID.
+export interface PersonInfo {
+  name: string | null;
+  birthday: string | null;
+  deathday: string | null;
+  place: string | null;
+  department: string | null;
+  profile: string | null;
+  bio: string;
+}
+export type People = Record<string, PersonInfo>;
 export interface CollectionPart {
   tmdbId: number;
   title: string;
@@ -49,6 +61,7 @@ interface DataState {
   aspectRatios: string[]; // Bildformate, nach Seitenverhältnis sortiert (schmal → breit)
   collections: Collections; // TMDB-Filmreihen (id -> Teile) für die Sammlung-Ansicht
   collectionExtras: CollectionExtras; // kuratierte Zusatztitel je Reihe (Ableger/Spinoffs)
+  people: People; // Darsteller-Stammdaten (TMDB-Personen-ID -> Infos)
   discoverById: Map<number, CollectionPart>; // nicht besessene Titel nach tmdbId (Entdecken-Seite)
   loading: boolean;
   error: string | null;
@@ -68,6 +81,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [doc, setDoc] = useState<MoviesDoc | null>(null);
   const [collections, setCollections] = useState<Collections>({});
   const [collectionExtras, setCollectionExtras] = useState<CollectionExtras>({});
+  const [people, setPeople] = useState<People>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -80,6 +94,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       .then((r) => (r.ok ? r.json() : {}))
       .then((c) => setCollectionExtras(c || {}))
       .catch(() => setCollectionExtras({}));
+    fetch(`${import.meta.env.BASE_URL}people.json`, { cache: 'no-cache' })
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((p) => setPeople(p || {}))
+      .catch(() => setPeople({}));
   }, []);
 
   useEffect(() => {
@@ -199,11 +217,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
       aspectRatios,
       collections,
       collectionExtras,
+      people,
       discoverById,
       loading,
       error,
     };
-  }, [doc, collections, collectionExtras, loading, error]);
+  }, [doc, collections, collectionExtras, people, loading, error]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

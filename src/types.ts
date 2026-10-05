@@ -1,4 +1,5 @@
 export interface CastMember {
+  id?: number; // TMDB-Personen-ID (für Stammdaten in people.json)
   name: string;
   character: string | null;
   profile: string | null; // TMDB-Profilpfad (/xxx.jpg) oder null

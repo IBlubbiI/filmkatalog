@@ -55,6 +55,8 @@ export function makeTmdbClient(key, { lang = 'de-DE' } = {}) {
       get('/search/tv', { query, first_air_date_year: year, language: lang, include_adult: false }),
     movie: (id) => get(`/movie/${id}`, { language: lang, append_to_response: 'credits' }),
     tv: (id) => get(`/tv/${id}`, { language: lang, append_to_response: 'credits' }),
+    // Personendaten (Biografie, Geburtsdatum …). lang2 erlaubt EN-Fallback für die Vita.
+    person: (id, lang2) => get(`/person/${id}`, { language: lang2 || lang }),
     collection: (id) => get(`/collection/${id}`, { language: lang }),
     // Kino-/Digital-/Physical-Release-Termine je Land (Typ 5 = Physical = DVD/BD/4K)
     releaseDates: (id) => get(`/movie/${id}/release_dates`),

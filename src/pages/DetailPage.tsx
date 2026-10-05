@@ -41,11 +41,28 @@ function CastRow({ cast, onSelect }: { cast: CastMember[]; onSelect: (c: CastMem
   );
 }
 
-/** Popup zu einem Darsteller: Rolle + weitere Filme dieser Person in der Sammlung. */
+// Alter aus Geburtsdatum (bis heute bzw. bis zum Todestag) berechnen.
+function ageFrom(birthday: string, deathday: string | null): number | null {
+  const b = new Date(birthday);
+  if (isNaN(b.getTime())) return null;
+  const end = deathday ? new Date(deathday) : new Date();
+  let age = end.getFullYear() - b.getFullYear();
+  const mo = end.getMonth() - b.getMonth();
+  if (mo < 0 || (mo === 0 && end.getDate() < b.getDate())) age--;
+  return age >= 0 ? age : null;
+}
+const deDate = (s: string) => {
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? s : d.toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' });
+};
+
+/** Popup zu einem Darsteller: Stammdaten + weitere Filme dieser Person in der Sammlung. */
 function CastModal({ actor, currentGid, onClose }: { actor: CastMember; currentGid: string; onClose: () => void }) {
   const data = useData();
-  const photo = actor.profile ? `https://image.tmdb.org/t/p/w185${actor.profile}` : null;
-  const tmdbSearch = `https://www.themoviedb.org/search?query=${encodeURIComponent(actor.name)}`;
+  const person = actor.id != null ? data.people[String(actor.id)] : undefined;
+  const profilePath = actor.profile || person?.profile || null;
+  const photo = profilePath ? `https://image.tmdb.org/t/p/w185${profilePath}` : null;
+  const age = person?.birthday ? ageFrom(person.birthday, person.deathday) : null;
   const appearances = useMemo(() => {
     const seen = new Set<string>();
     const out: { movie: Movie; character: string | null }[] = [];
@@ -83,14 +100,21 @@ function CastModal({ actor, currentGid, onClose }: { actor: CastMember; currentG
           <div className="min-w-0 flex-1">
             <h3 className="text-base font-bold leading-tight">{actor.name}</h3>
             {actor.character && <p className="text-sm text-zinc-400">als {actor.character}</p>}
-            <a href={tmdbSearch} target="_blank" rel="noopener noreferrer" className="mt-1.5 inline-block text-xs text-accent-soft hover:underline">
-              Mehr zu {actor.name} bei TMDB →
-            </a>
+            {person?.birthday && (
+              <p className="mt-1 text-xs text-zinc-500">
+                * {deDate(person.birthday)}
+                {person.deathday ? ` – † ${deDate(person.deathday)}` : age != null ? ` · ${age} Jahre` : ''}
+                {person.deathday && age != null ? ` (${age} J.)` : ''}
+              </p>
+            )}
+            {person?.place && <p className="text-xs text-zinc-500">{person.place}</p>}
           </div>
           <button onClick={onClose} className="rounded-full p-1 text-zinc-500 hover:bg-ink-700" aria-label="Schließen">
             <IconClose width={18} height={18} />
           </button>
         </div>
+
+        {person?.bio && <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-zinc-300">{person.bio}</p>}
 
         <h4 className="mb-2 mt-5 text-xs font-semibold uppercase tracking-wide text-accent/80">
           {appearances.length > 0 ? `Weitere Filme in deiner Sammlung (${appearances.length})` : 'Weitere Filme in deiner Sammlung'}
