@@ -30,7 +30,7 @@ const isJunk = (v: string) => !v.trim() || JUNK.test(v);
 // Label: „Blumhouse / Universal Pictures" → einzelne Labels, damit jedes separat wählbar ist.
 const splitAtomic = (v: string) => v.split(/\s*[/,]\s*/).map((s) => s.trim()).filter(Boolean);
 
-type Field = { k: string; l: string; t: 'text' | 'number' | 'select'; o?: string[] };
+type Field = { k: string; l: string; t: 'text' | 'number' | 'select'; o?: string[]; ph?: string };
 const GROUPS: { group: string; items: Field[] }[] = [
   {
     group: 'Basis',
@@ -51,7 +51,7 @@ const GROUPS: { group: string; items: Field[] }[] = [
     items: [
       { k: 'disc_format', l: 'Discformat(e)', t: 'text' },
       { k: 'discs', l: 'Discs', t: 'number' },
-      { k: 'disc_capacity', l: 'Disc-Kapazität (z. B. 1x UHD Blu-ray (100 GB), 1x Blu-ray (50 GB))', t: 'text' },
+      { k: 'disc_capacity', l: 'Disc-Kapazität', t: 'text', ph: 'z. B. 1x UHD BD (100 GB), 2x BD (50 GB)' },
       { k: 'native_4k', l: 'Natives 4K', t: 'select', o: ['', 'Ja', 'Nein'] },
       { k: 'hdr', l: 'HDR / Dolby Vision', t: 'text' },
       { k: 'atmos', l: 'Atmos', t: 'select', o: ['', 'Ja', 'Nein'] },
@@ -485,6 +485,17 @@ export function VerwaltenPage() {
               {form.id} {form.tmdb_override ? <span className="text-zinc-500">· TMDB {String(form.tmdb_override)}</span> : null}
             </h2>
             <div className="flex items-center gap-2">
+              {(form.title_de || form.title_original) && (
+                <a
+                  href={`https://www.media-dealer.de/index.php?lang=0&cl=search&searchparam=${encodeURIComponent(String(form.title_de || form.title_original || ''))}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-ink-700 bg-ink-800 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-ink-700"
+                  title="Technische Specs (u. a. Disc-Kapazität) bei media-dealer nachschlagen"
+                >
+                  🔎 media-dealer
+                </a>
+              )}
               <button
                 onClick={() => scanInput.current?.click()}
                 disabled={busy}
@@ -513,8 +524,9 @@ export function VerwaltenPage() {
                           type={f.t === 'number' ? 'number' : 'text'}
                           value={String(form[f.k] ?? '')}
                           onChange={(e) => set(f.k, e.target.value)}
+                          placeholder={f.ph}
                           list={f.t === 'text' && suggestions[f.k]?.length ? `dl-${f.k}` : undefined}
-                          className="w-full rounded-lg border border-ink-700 bg-ink-800 px-2 py-1.5 text-sm focus:border-accent/60"
+                          className="w-full rounded-lg border border-ink-700 bg-ink-800 px-2 py-1.5 text-sm placeholder:text-zinc-600 focus:border-accent/60"
                         />
                         {f.t === 'text' && suggestions[f.k]?.length ? (
                           <datalist id={`dl-${f.k}`}>
