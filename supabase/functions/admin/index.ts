@@ -115,12 +115,14 @@ Deno.serve(async (req) => {
         const prompt =
           'Du erhältst ein Foto der Rückseite (oder Vorderseite) einer Film-Disc (DVD/Blu-ray/4K UHD). ' +
           'Lies alle erkennbaren Angaben aus und gib NUR ein JSON-Objekt mit genau diesen Schlüsseln zurück: ' +
-          'title_de, title_original, year, director, disc_format, discs, native_4k, hdr, atmos, aspect_ratio, ' +
+          'title_de, title_original, year, director, disc_format, discs, disc_capacity, native_4k, hdr, atmos, aspect_ratio, ' +
           'fsk, runtime_min, label, edition, ean, audio_ov, audio_de, subtitles_de, genre, bonus. ' +
           'WICHTIG: Was nicht klar erkennbar ist, als leeren String "" zurückgeben – NIEMALS Platzhalter wie ' +
           '"nicht ermittelt", "unbekannt" oder erklärende Sätze. Nur der reine Wert oder "". ' +
           'Normiere die Werte kanonisch: ' +
           'disc_format z.B. "4K UHD + Blu-ray", "Blu-ray", "Blu-ray + DVD", "DVD". ' +
+          'disc_capacity = Anzahl, Typ und Kapazität der Discs wie auf der Hülle angegeben, ' +
+          'z.B. "1x UHD Blu-ray (100 GB), 2x Blu-ray Disc (50 GB)" – wenn keine GB-Angabe erkennbar, leer lassen. ' +
           'native_4k und atmos jeweils "Ja" oder "Nein". ' +
           'hdr nur die Formate, z.B. "Dolby Vision, HDR10", "HDR10", "HDR10+". ' +
           'aspect_ratio als reines Verhältnis, z.B. "2.39:1", "1.85:1", "1.78:1 (16:9)" – ohne Zusatztext. ' +

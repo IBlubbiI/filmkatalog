@@ -51,6 +51,7 @@ const GROUPS: { group: string; items: Field[] }[] = [
     items: [
       { k: 'disc_format', l: 'Discformat(e)', t: 'text' },
       { k: 'discs', l: 'Discs', t: 'number' },
+      { k: 'disc_capacity', l: 'Disc-Kapazität (z. B. 1x UHD Blu-ray (100 GB), 1x Blu-ray (50 GB))', t: 'text' },
       { k: 'native_4k', l: 'Natives 4K', t: 'select', o: ['', 'Ja', 'Nein'] },
       { k: 'hdr', l: 'HDR / Dolby Vision', t: 'text' },
       { k: 'atmos', l: 'Atmos', t: 'select', o: ['', 'Ja', 'Nein'] },

@@ -18,6 +18,7 @@ const COLMAP = {
   main_genre: 'Hauptgenre',
   disc_format: 'Discformat(e)',
   discs: 'Discs',
+  disc_capacity: 'Disc-Kapazität',
   edition: 'Edition/Verpackung',
   box: 'Box/Sammlung',
   label: 'Label',

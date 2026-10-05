@@ -20,6 +20,14 @@ interface Props {
   setState: React.Dispatch<React.SetStateAction<FilterState>>;
 }
 
+// Disc-Kapazität-Tags sortieren: UHD → BD → DVD → Disc, darin nach GB absteigend.
+const CAP_ORDER: Record<string, number> = { UHD: 0, BD: 1, DVD: 2, Disc: 3 };
+function sortCapacity(a: string, b: string): number {
+  const [ta, ga] = [a.split(' ')[0], parseInt(a.match(/(\d+)\s*GB/)?.[1] ?? '0', 10)];
+  const [tb, gb] = [b.split(' ')[0], parseInt(b.match(/(\d+)\s*GB/)?.[1] ?? '0', 10)];
+  return (CAP_ORDER[ta] ?? 9) - (CAP_ORDER[tb] ?? 9) || gb - ga || a.localeCompare(b);
+}
+
 function Section({ title, children, hint }: { title: string; hint?: React.ReactNode; children: React.ReactNode }) {
   return (
     <section className="border-t border-ink-700/70 py-4 first:border-t-0">
@@ -95,6 +103,7 @@ export function FilterSheet({ open, onClose, movies, state, setState }: Props) {
   const total = useMemo(() => movies.filter((m) => matches(m, state)).length, [movies, state]);
   const typeC = useMemo(() => facetCounts(movies, state, 'type', (m) => m.type), [movies, state]);
   const discC = useMemo(() => facetCounts(movies, state, 'discFormat', (m) => m.discFormat), [movies, state]);
+  const capC = useMemo(() => facetCounts(movies, state, 'discCapacity', (m) => m.discCapacityTags), [movies, state]);
   const genreC = useMemo(() => facetCounts(movies, state, 'mainGenre', (m) => m.genresAll), [movies, state]);
   const fskC = useMemo(
     () => facetCounts<FskValue>(movies, state, 'fsk', (m) => (m.fsk == null ? 'unbekannt' : m.fsk)),
@@ -183,6 +192,16 @@ export function FilterSheet({ open, onClose, movies, state, setState }: Props) {
               ))}
             </div>
           </Section>
+
+          {capC.size > 0 && (
+            <Section title="Disc-Kapazität" hint="Mehrfachauswahl">
+              <div className="flex flex-wrap gap-2">
+                {[...capC.keys()].sort(sortCapacity).map((c) => (
+                  <Chip key={c} label={c} count={capC.get(c) ?? 0} active={state.discCapacity.includes(c)} onClick={() => toggleArr('discCapacity', c)} />
+                ))}
+              </div>
+            </Section>
+          )}
 
           <Section title="Bild & Ton">
             <div className="flex flex-wrap gap-2">

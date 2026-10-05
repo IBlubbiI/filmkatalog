@@ -8,6 +8,7 @@ export type GenreMode = 'or' | 'and';
 
 export interface FilterState {
   discFormat: string[];
+  discCapacity: string[];
   native4kOnly: boolean;
   hdr: HdrMode;
   mainGenre: string[];
@@ -32,6 +33,7 @@ export const DISC_FORMATS = ['DVD', 'Blu-ray', '4K UHD', '4K UHD + Blu-ray'];
 export function emptyFilters(): FilterState {
   return {
     discFormat: [],
+    discCapacity: [],
     native4kOnly: false,
     hdr: 'any',
     mainGenre: [],
@@ -57,6 +59,7 @@ const seenOf = (m: Movie): SeenValue => (m.seen === true ? 'ja' : m.seen === fal
 /** Ein Prädikat pro Filter-Dimension. */
 export const DIMS: Record<string, (m: Movie, s: FilterState) => boolean> = {
   discFormat: (m, s) => s.discFormat.length === 0 || (!!m.discFormat && s.discFormat.includes(m.discFormat)),
+  discCapacity: (m, s) => !s.discCapacity?.length || (m.discCapacityTags ?? []).some((t) => s.discCapacity.includes(t)),
   native4k: (m, s) => !s.native4kOnly || m.native4k === 'Ja',
   hdr: (m, s) => s.hdr === 'any' || (s.hdr === 'has' ? m.hasHdr : m.hasDolbyVision),
   // Matcht über das gesamte Genre-Set (Hauptgenre + Genres). ODER = mind. eines,
@@ -106,6 +109,7 @@ export function applyFilters(movies: Movie[], s: FilterState): Movie[] {
 export function activeCount(s: FilterState): number {
   let n = 0;
   n += s.discFormat.length;
+  n += s.discCapacity.length;
   n += s.native4kOnly ? 1 : 0;
   n += s.hdr !== 'any' ? 1 : 0;
   n += s.mainGenre.length;

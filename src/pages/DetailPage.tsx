@@ -420,6 +420,7 @@ export function DetailPage() {
         <Block title="Bild & Ton">
           <Row label="Discformat" value={movie.discFormat} />
           <Row label="Discs" value={movie.discCountRaw} />
+          <Row label="Disc-Kapazität" value={movie.discCapacity} />
           <Row label="Natives 4K" value={movie.native4k} />
           <Row label="HDR" value={movie.hdr} />
           <Row label="Bildformat" value={movie.aspectRatio} />

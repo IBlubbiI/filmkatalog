@@ -41,6 +41,8 @@ export interface Movie {
   hasDvd: boolean;
   discCount: number | null;
   discCountRaw: string | null;
+  discCapacity: string | null; // Rohtext, z. B. "1x UHD Blu-ray (100 GB), 2x Blu-ray Disc (50 GB)"
+  discCapacityTags: string[]; // Filter-Tags, z. B. ["UHD 100 GB", "BD 50 GB"]
   edition: string | null;
   box: string | null;
   boxKey: string | null;

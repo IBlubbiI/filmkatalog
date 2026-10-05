@@ -54,6 +54,25 @@ const NO_TMDB = FLAGS.has('--no-tmdb');
 const log = (...a) => console.log(...a);
 const warn = (...a) => console.warn('  ⚠ ', ...a);
 
+// Disc-Kapazität "1x UHD Blu-ray (100 GB), 2x Blu-ray Disc (50 GB)" → Filter-Tags
+// ["UHD 100 GB", "BD 50 GB"] (für die Facetten-Filterung; Rohtext bleibt erhalten).
+function capacityTags(s) {
+  if (!s) return [];
+  const out = [];
+  // Trennzeichen zwischen Disc-Angaben: ";" oder "," – aber NICHT das Dezimalkomma
+  // in Zahlen wie "8,5 GB" (Komma vor einer Ziffer bleibt stehen).
+  for (const seg of String(s).split(/,(?![0-9])|;/)) {
+    const t = seg.trim();
+    if (!t) continue;
+    const gb = (t.match(/(\d+(?:[.,]\d+)?)\s*GB/i) || [])[1];
+    const type = /uhd|ultra ?hd|ud blu/i.test(t) ? 'UHD' : /blu-?ray|\bbd\b/i.test(t) ? 'BD' : /dvd/i.test(t) ? 'DVD' : gb ? 'Disc' : null;
+    if (!type) continue;
+    // GB nur bei UHD/BD anhängen (bei DVD kaum relevant und oft ungenau).
+    out.push(gb && type !== 'DVD' ? `${type} ${gb} GB` : type);
+  }
+  return [...new Set(out)];
+}
+
 // ---------------------------------------------------------------------------
 //  kleine Helfer
 // ---------------------------------------------------------------------------
@@ -233,6 +252,8 @@ function toMovie(r) {
     hasDvd,
     discCount: firstInt(r['Discs']),
     discCountRaw: cleanKeepDash(r['Discs']),
+    discCapacity: clean(r['Disc-Kapazität']),
+    discCapacityTags: capacityTags(clean(r['Disc-Kapazität'])),
     edition: clean(r['Edition/Verpackung']),
     // Sammlung
     box,
