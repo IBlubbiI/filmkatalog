@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useData } from '../lib/data';
 import { PosterImage } from '../components/PosterImage';
-import { IconChevronLeft, IconSearch, IconClose, IconDisc } from '../components/Icons';
+import { IconChevronLeft, IconSearch, IconClose } from '../components/Icons';
+import { SectionNav } from '../components/SectionNav';
 import { formatBadges } from '../lib/format';
 import type { Movie } from '../types';
 
@@ -236,6 +237,7 @@ function loadView(): { mode: Mode; showUpcoming: boolean; q: string } {
 
 export function SammlungPage() {
   const data = useData();
+  const navigate = useNavigate();
   const sections = useMemo(() => buildSections(data), [data]);
   const init = loadView();
   const [mode, setMode] = useState<Mode>(init.mode);
@@ -301,16 +303,17 @@ export function SammlungPage() {
       <header className="sticky top-0 z-10 -mx-4 bg-ink-900/90 px-4 pb-2 pt-3 backdrop-blur-md">
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Link to="/" className="inline-flex items-center gap-1 rounded-full bg-ink-800 py-1.5 pl-2 pr-3 text-sm hover:bg-ink-700">
-              <IconChevronLeft width={18} height={18} /> Katalog
-            </Link>
+            <button
+              onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/'))}
+              className="inline-flex items-center gap-1 rounded-full bg-ink-800 py-1.5 pl-2 pr-3 text-sm hover:bg-ink-700"
+            >
+              <IconChevronLeft width={18} height={18} /> Zurück
+            </button>
             <h1 className="text-lg font-bold">Sammlung</h1>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[11px] text-zinc-500">{sections.length} Reihen</span>
-            <Link to="/verwalten" className="rounded-full p-1.5 text-zinc-500 hover:bg-ink-800 hover:text-zinc-300" aria-label="Verwalten" title="Verwalten">
-              <IconDisc width={18} height={18} />
-            </Link>
+            <span className="hidden text-[11px] text-zinc-500 sm:inline">{sections.length} Reihen</span>
+            <SectionNav current="sammlung" />
           </div>
         </div>
         <div className="relative">

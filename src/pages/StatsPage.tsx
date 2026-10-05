@@ -1,9 +1,10 @@
 import { useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useData } from '../lib/data';
 import { useUserData } from '../lib/userData';
 import { useDriveSync } from '../lib/driveSync';
 import { IconChevronLeft } from '../components/Icons';
+import { SectionNav } from '../components/SectionNav';
 import type { Movie } from '../types';
 
 function DriveSync() {
@@ -145,6 +146,7 @@ function Stat({ value, label }: { value: string; label: string }) {
 
 export function StatsPage() {
   const data = useData();
+  const navigate = useNavigate();
   const M = data.movies;
 
   const stats = useMemo(() => {
@@ -168,11 +170,17 @@ export function StatsPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 pb-16">
-      <header className="sticky top-0 z-10 -mx-4 flex items-center gap-2 bg-ink-900/90 px-4 py-3 backdrop-blur-md">
-        <Link to="/" className="inline-flex items-center gap-1 rounded-full bg-ink-800 py-1.5 pl-2 pr-3 text-sm hover:bg-ink-700">
-          <IconChevronLeft width={18} height={18} /> Zurück
-        </Link>
-        <h1 className="text-lg font-bold">Statistik</h1>
+      <header className="sticky top-0 z-10 -mx-4 flex items-center justify-between gap-2 bg-ink-900/90 px-4 py-3 backdrop-blur-md">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/'))}
+            className="inline-flex items-center gap-1 rounded-full bg-ink-800 py-1.5 pl-2 pr-3 text-sm hover:bg-ink-700"
+          >
+            <IconChevronLeft width={18} height={18} /> Zurück
+          </button>
+          <h1 className="text-lg font-bold">Statistik</h1>
+        </div>
+        <SectionNav current="stats" />
       </header>
 
       <div className="mt-4 grid grid-cols-3 gap-3">

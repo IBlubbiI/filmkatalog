@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useData } from '../lib/data';
 import { admin, checkPassword, fetchRow, fetchAllRows, type MovieRow, type TmdbHit } from '../lib/admin';
 import { IconChevronLeft, IconSearch, IconClose } from '../components/Icons';
+import { SectionNav } from '../components/SectionNav';
 
 // Felder, die individuell sind → keine Vorschlagsliste.
 const NO_SUGGEST = new Set(['title_de', 'title_original', 'ean', 'bonus', 'other_copies', 'year', 'discs', 'runtime_min', 'rating']);
@@ -106,6 +107,7 @@ export function VerwaltenPage() {
   const [editQuery, setEditQuery] = useState('');
   const [suggestions, setSuggestions] = useState<Record<string, string[]>>({});
   const [sp] = useSearchParams();
+  const navigate = useNavigate();
   const autoDone = useRef(false);
   const scanInput = useRef<HTMLInputElement>(null);
 
@@ -289,14 +291,20 @@ export function VerwaltenPage() {
     <div className="mx-auto max-w-4xl px-4 pb-28">
       <header className="sticky top-0 z-10 -mx-4 flex items-center justify-between gap-2 bg-ink-900/90 px-4 py-3 backdrop-blur-md">
         <div className="flex items-center gap-2">
-          <Link to="/" className="inline-flex items-center gap-1 rounded-full bg-ink-800 py-1.5 pl-2 pr-3 text-sm hover:bg-ink-700">
-            <IconChevronLeft width={18} height={18} /> Katalog
-          </Link>
+          <button
+            onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/'))}
+            className="inline-flex items-center gap-1 rounded-full bg-ink-800 py-1.5 pl-2 pr-3 text-sm hover:bg-ink-700"
+          >
+            <IconChevronLeft width={18} height={18} /> Zurück
+          </button>
           <h1 className="text-lg font-bold">Verwalten</h1>
         </div>
-        <button onClick={publish} disabled={busy} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-bold text-ink-950 hover:bg-accent-soft disabled:opacity-50">
-          Veröffentlichen
-        </button>
+        <div className="flex items-center gap-2">
+          <SectionNav current="verwalten" />
+          <button onClick={publish} disabled={busy} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-bold text-ink-950 hover:bg-accent-soft disabled:opacity-50">
+            Veröffentlichen
+          </button>
+        </div>
       </header>
 
       {msg && (
@@ -379,9 +387,9 @@ export function VerwaltenPage() {
             {editList.length === 0 && <p className="py-6 text-center text-sm text-zinc-500">Keine Treffer.</p>}
             {editList.map((m) => (
               <div key={m.id} className="flex items-center justify-between gap-2 px-2 py-2">
-                <span className="min-w-0 truncate text-sm">
+                <button onClick={() => editExisting(m.id)} disabled={busy} className="min-w-0 flex-1 truncate text-left text-sm hover:text-accent-soft">
                   <span className="text-zinc-500">{m.id}</span> · {m.title} {m.year && <span className="text-zinc-500">({m.year})</span>}
-                </span>
+                </button>
                 <span className="flex shrink-0 gap-1">
                   <button onClick={() => editExisting(m.id)} disabled={busy} className="rounded-md bg-ink-800 px-2.5 py-1 text-xs hover:bg-ink-700">Bearbeiten</button>
                   <button onClick={() => del(m.id, m.title)} disabled={busy} className="rounded-md bg-red-500/15 px-2.5 py-1 text-xs text-red-300 hover:bg-red-500/25">Entfernen</button>
