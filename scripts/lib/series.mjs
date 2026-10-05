@@ -19,7 +19,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { SERIES_EXTRAS, SERIES_DENY, SERIES_NO_DISCOVERY } from './series-extras.mjs';
+import { SERIES_EXTRAS, SERIES_DENY, SERIES_NO_DISCOVERY, SERIES_MAIN, SERIES_FLAT, COLLECTION_HIDE } from './series-extras.mjs';
 
 const TODAY = new Date().toISOString().slice(0, 10);
 const isFuture = (dateStr) => !!dateStr && dateStr.slice(0, 10) > TODAY;
@@ -141,7 +141,7 @@ export async function buildSeriesData({ movies, client, root, refresh = false, l
 
   // ---- 1. TMDB-Filmreihen (Collections) -------------------------------------
   const collCache = readJson(COLLECTIONS_CACHE, {});
-  const collIds = [...new Set(owned.map((m) => m.tmdb.collection?.id).filter(Boolean))];
+  const collIds = [...new Set(owned.map((m) => m.tmdb.collection?.id).filter(Boolean))].filter((cid) => !COLLECTION_HIDE.has(cid));
   let collFetched = 0;
   for (const cid of collIds) {
     if (!refresh && collCache[cid]) continue;
@@ -208,7 +208,8 @@ export async function buildSeriesData({ movies, client, root, refresh = false, l
       if (deny.has(it.tmdbId)) continue;
       const meta = await detailMeta(it.tmdbId, it.type);
       if (!meta) continue;
-      parts.push({ tmdbId: it.tmdbId, type: it.type, title: meta.title, year: meta.year, poster: meta.poster, future: meta.future, ...detailFields(meta) });
+      const main = SERIES_FLAT.has(key) || SERIES_MAIN.has(it.tmdbId) || undefined;
+      parts.push({ tmdbId: it.tmdbId, type: it.type, title: meta.title, year: meta.year, poster: meta.poster, future: meta.future, main, ...detailFields(meta) });
       groups.get(key)?.known.add(it.tmdbId);
     }
   }
@@ -247,7 +248,8 @@ export async function buildSeriesData({ movies, client, root, refresh = false, l
       seen.add(r.id);
       const meta = await detailMeta(r.id, r.type);
       if (!meta || !meta.real) continue; // Making-of/Kurzfilm/Doku raus
-      parts.push({ tmdbId: r.id, type: r.type, title: meta.title || r.title, year: meta.year, poster: meta.poster, future: meta.future, auto: true, ...detailFields(meta) });
+      const main = SERIES_FLAT.has(key) || SERIES_MAIN.has(r.id) || undefined;
+      parts.push({ tmdbId: r.id, type: r.type, title: meta.title || r.title, year: meta.year, poster: meta.poster, future: meta.future, auto: true, main, ...detailFields(meta) });
       g.known.add(r.id);
       count++;
       discovered++;

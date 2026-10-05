@@ -14,11 +14,16 @@
 // Nach Änderungen `npm run build:data` (oder build:series) neu laufen lassen.
 
 export const SERIES_EXTRAS = {
-  // Christopher-Nolan-Filme, die (noch) nicht im Besitz sind – Regisseur-Reihe.
+  // Christopher-Nolan-Filme – Regisseur-Reihe (flach, alle gleichwertig). Enthält
+  // sowohl nicht besessene Filme als auch die Dark-Knight-Trilogie (im Besitz, aber
+  // als Kategorie DC geführt → sonst nur im DC-Universum sichtbar).
   'Christopher Nolan': [
     { tmdbId: 11660, type: 'movie' }, // Following (1998)
     { tmdbId: 77, type: 'movie' }, // Memento (2000)
     { tmdbId: 320, type: 'movie' }, // Insomnia – Schlaflos (2002)
+    { tmdbId: 272, type: 'movie' }, // Batman Begins (2005) – im Besitz (F001)
+    { tmdbId: 155, type: 'movie' }, // The Dark Knight (2008) – im Besitz (F002)
+    { tmdbId: 49026, type: 'movie' }, // The Dark Knight Rises (2012) – im Besitz (F003)
     { tmdbId: 872585, type: 'movie' }, // Oppenheimer (2023)
     { tmdbId: 1368337, type: 'movie' }, // Die Odyssee (2026)
   ],
@@ -45,6 +50,7 @@ export const SERIES_EXTRAS = {
     { tmdbId: 396422, type: 'movie' }, // Annabelle 2 (Creation)
     { tmdbId: 521029, type: 'movie' }, // Annabelle 3 (Comes Home)
     { tmdbId: 480414, type: 'movie' }, // Lloronas Fluch
+    { tmdbId: 439079, type: 'movie' }, // The Nun (Teil 1)
     { tmdbId: 968051, type: 'movie' }, // The Nun II
     { tmdbId: 138843, type: 'movie' }, // Conjuring 1
     { tmdbId: 423108, type: 'movie' }, // Conjuring 3
@@ -84,9 +90,41 @@ export const SERIES_DENY = [
   41897, // "Auch die Engel mögen's heiß" – ohne Bud Spencer/Terence Hill
   1732617, // "Pirates of the Caribbean: Other Pirates of the Caribbean" – Fake/kein Announcement
   1377658, // "Ghostbusters: Family Edition" – existiert nicht als echter Film
+  1025958, // "Dirty Dancing: Official Dance Workout" – kein Film, nur ein Workout-Video
+  49530, // "Dexter: Early Cuts" – animierte Webisodes, kein echter Titel
+  283086, // "Dexter: The Dark Defender" – Fan/Webisode
+  1548951, // "Resident Evil: Red Falls" – Fanfilm
+  329581, // "Resident Evil: First Hour" – Fanfilm
 ];
 
 // Reihen, für die KEINE automatische Entdeckung läuft (nur eigene Titel + Sammlung).
 export const SERIES_NO_DISCOVERY = new Set([
   'Augsburger Puppenkiste', // dutzende Einzelfolgen/Boxen → zu unübersichtlich
+  'Avatar', // Auto-Suche verwechselt "Avatar: Aufbruch nach Pandora" mit "Avatar – Herr der Elemente"
+  'col:645678', // Hänsel & Gretel – zufälliger Namensstamm, unzusammenhängende Trash-Filme
+]);
+
+// Extra-Titel, die trotz „Extra"-Herkunft zur HAUPTREIHE gehören (fortlaufende Story),
+// nicht zu den Spin-offs. Schlüssel = TMDB-ID.
+export const SERIES_MAIN = new Set([
+  33907, // Downton Abbey (Serie) – Beginn der durchgehenden Geschichte
+  1289936, // Downton Abbey: Das große Finale
+  474350, // Es Kapitel 2 – direkte Fortsetzung von „Es"
+  479455, // Men in Black – International – offiziell Teil 4
+  259909, // Dexter: Wiedererwachen (Resurrection) – Fortsetzung von New Blood
+  138843, // Conjuring – Die Heimsuchung (Teil 1)
+  423108, // Conjuring 3
+  1038392, // Conjuring 4: Das letzte Kapitel
+]);
+
+// Reihen, die FLACH dargestellt werden (keine Haupt-/Spin-off-Trennung) – alle Filme
+// gleichwertig, z. B. Regisseur-/Autoren-Reihen. Schlüssel = universe/franchise-Wert.
+export const SERIES_FLAT = new Set([
+  'Christopher Nolan', // Regisseur-Reihe
+  'Astrid Lindgren', // Autoren-Reihe (Buchverfilmungen)
+]);
+
+// TMDB-Collection-IDs, die NICHT als Reihe dargestellt werden (Filme werden Einzeltitel).
+export const COLLECTION_HIDE = new Set([
+  645678, // „Hänsel und Gretel Filmreihe" – fasst unzusammenhängende Filme zusammen
 ]);

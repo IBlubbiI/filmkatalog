@@ -84,10 +84,25 @@ function buildSections(data: ReturnType<typeof useData>): Section[] {
     if (catFilms.length < 2) continue;
     // Hauptreihe: eigene Hauptstory-Filme + kanonische (nicht besessene) Titel aus `cat:<cat>`
     const mainList = entriesFromFilms(catFilms.filter((m) => isMainStory(m, cat)), data, globalOwned, [`cat:${cat}`]);
-    const spinList = entriesFromFilms(catFilms.filter((m) => !isMainStory(m, cat)), data, globalOwned, []);
+    const spinFilms = catFilms.filter((m) => !isMainStory(m, cat));
     const groups: SubGroup[] = [];
     if (mainList.length) groups.push({ label: `Hauptreihe · ${SHORT[cat]} · chronologisch`, list: mainList });
-    if (spinList.length) groups.push({ label: 'Spin-offs & weitere Filme', list: spinList });
+    if (cat === 'Marvel') {
+      // Marvel-Spin-offs nach Sub-Reihe gruppieren (X-Men, Spider-Man, Venom, Hellboy, Ghost Rider …).
+      const bySub = new Map<string, Movie[]>();
+      for (const m of spinFilms) {
+        const sub = m.universe || m.franchise || m.title.split(/[:–-]/)[0].trim();
+        if (!bySub.has(sub)) bySub.set(sub, []);
+        bySub.get(sub)!.push(m);
+      }
+      for (const [sub, films] of [...bySub.entries()].sort((a, b) => a[0].localeCompare(b[0], 'de'))) {
+        const l = entriesFromFilms(films, data, globalOwned, []);
+        if (l.length) groups.push({ label: `Spin-offs · ${sub}`, list: l });
+      }
+    } else {
+      const spinList = entriesFromFilms(spinFilms, data, globalOwned, []);
+      if (spinList.length) groups.push({ label: 'Spin-offs & weitere Filme', list: spinList });
+    }
     if (groups.length) universes.push({ key: `cat:${cat}`, name: `${cat}-Universum`, groups });
   }
 
@@ -104,10 +119,11 @@ function buildSections(data: ReturnType<typeof useData>): Section[] {
   for (const [key, { name, films }] of byKey) {
     const list = entriesFromFilms(films, data, globalOwned, [key]);
     if (list.length < 2) continue;
-    // Hauptreihe (Collection-Filme + eigene) vs. Spin-offs (Ableger/Serien aus den Extras)
-    const extraIds = new Set((data.collectionExtras[key] ?? []).map((p) => p.tmdbId));
-    const main = list.filter((e) => !(e.tmdbId != null && extraIds.has(e.tmdbId)));
-    const spin = list.filter((e) => e.tmdbId != null && extraIds.has(e.tmdbId));
+    // Hauptreihe (Collection-Filme + eigene + als Hauptreihe markierte Extras) vs.
+    // Spin-offs (Ableger/Serien aus den Extras ohne `main`-Flag).
+    const spinIds = new Set((data.collectionExtras[key] ?? []).filter((p) => !p.main).map((p) => p.tmdbId));
+    const main = list.filter((e) => !(e.tmdbId != null && spinIds.has(e.tmdbId)));
+    const spin = list.filter((e) => e.tmdbId != null && spinIds.has(e.tmdbId));
     const groups =
       main.length && spin.length
         ? [

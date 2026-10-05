@@ -47,7 +47,8 @@ export const UNIVERSE_BY_ID = {
   F354: 'Augsburger Puppenkiste',
   F355: 'Augsburger Puppenkiste',
   F356: 'Augsburger Puppenkiste',
-  F357: 'Augsburger Puppenkiste',
+  // F357 (Wickie) gehört NICHT zur Augsburger Puppenkiste → eigene „Wickie"-Reihe
+  // über die TMDB-Collection (133962).
 };
 
 // Das "Universum" (breite Sammlung-Gruppe) eines Films bestimmen.
