@@ -34,7 +34,10 @@ jobs:
           cache: npm
       - run: npm ci
 
-      # TMDB-Matching-Cache über Läufe hinweg aufheben → schnelle Rebuilds
+      # TMDB-Matching-Cache über Läufe hinweg aufheben → schnelle Rebuilds.
+      # Key-Version v2: erzwingt einmalig einen frischen Lauf, damit die Besetzung
+      # die TMDB-Personen-IDs bekommt und people.json (Darsteller-Infos) befüllt wird.
+      # Der erste v2-Lauf dauert länger (holt Filme + Personen neu), danach wieder schnell.
       - name: TMDB-Cache wiederherstellen
         uses: actions/cache@v4
         with:
@@ -42,8 +45,9 @@ jobs:
             data/tmdb-cache.json
             data/tmdb-collections-cache.json
             data/tmdb-detail-cache.json
-          key: tmdb-cache-${{ github.run_id }}
-          restore-keys: tmdb-cache-
+            data/tmdb-people-cache.json
+          key: tmdb-cache-v2-${{ github.run_id }}
+          restore-keys: tmdb-cache-v2-
 
       - name: Daten aus Supabase bauen
         env:
