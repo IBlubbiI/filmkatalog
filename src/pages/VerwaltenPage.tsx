@@ -485,17 +485,6 @@ export function VerwaltenPage() {
               {form.id} {form.tmdb_override ? <span className="text-zinc-500">· TMDB {String(form.tmdb_override)}</span> : null}
             </h2>
             <div className="flex items-center gap-2">
-              {(form.title_de || form.title_original) && (
-                <a
-                  href={`https://www.media-dealer.de/index.php?lang=0&cl=search&searchparam=${encodeURIComponent(String(form.title_de || form.title_original || ''))}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-ink-700 bg-ink-800 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-ink-700"
-                  title="Technische Specs (u. a. Disc-Kapazität) bei media-dealer nachschlagen"
-                >
-                  🔎 media-dealer
-                </a>
-              )}
               <button
                 onClick={() => scanInput.current?.click()}
                 disabled={busy}
