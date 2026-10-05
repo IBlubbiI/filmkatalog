@@ -30,7 +30,12 @@ export function loadGis(): Promise<void> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let tokenClient: any = null;
 
-export async function requestToken(clientId: string, interactive: boolean): Promise<string> {
+export interface TokenResult {
+  token: string;
+  expiresAt: number; // ms-Zeitstempel, wann das Token abläuft
+}
+
+export async function requestToken(clientId: string, interactive: boolean): Promise<TokenResult> {
   await loadGis();
   return new Promise((resolve, reject) => {
     if (!tokenClient) {
@@ -40,9 +45,9 @@ export async function requestToken(clientId: string, interactive: boolean): Prom
         callback: () => {}, // wird pro Anfrage überschrieben
       });
     }
-    tokenClient.callback = (resp: { access_token?: string; error?: string }) => {
+    tokenClient.callback = (resp: { access_token?: string; expires_in?: number; error?: string }) => {
       if (resp.error || !resp.access_token) reject(new Error(resp.error || 'Kein Token erhalten'));
-      else resolve(resp.access_token);
+      else resolve({ token: resp.access_token, expiresAt: Date.now() + (resp.expires_in ?? 3600) * 1000 });
     };
     // interactive -> Consent-Fenster; sonst still (falls schon zugestimmt)
     tokenClient.requestAccessToken({ prompt: interactive ? 'consent' : '' });

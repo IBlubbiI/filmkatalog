@@ -5,6 +5,7 @@ import { useUserData, type UserDataMap } from './userData';
 
 type Status = 'disconnected' | 'connecting' | 'connected' | 'error';
 const FLAG = 'filmkatalog.drive.connected';
+const TOKEN_KEY = 'filmkatalog.drive.token';
 
 interface Ctx {
   enabled: boolean; // Client-ID konfiguriert?
@@ -29,15 +30,48 @@ export function DriveSyncProvider({ children }: { children: ReactNode }) {
   const [syncing, setSyncing] = useState(false);
 
   const token = useRef<string | null>(null);
+  const tokenExp = useRef<number>(0);
   const fileId = useRef<string | null>(null);
   const uploadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Token holen (still oder mit Zustimmungsfenster)
-  const getToken = useCallback(async (interactive: boolean) => {
-    const t = await requestToken(GOOGLE_CLIENT_ID, interactive);
-    token.current = t;
-    return t;
+  // Gültiges Token im Speicher/localStorage (kein Google-Aufruf) – sonst null.
+  const validToken = useCallback((): string | null => {
+    if (token.current && tokenExp.current - 60_000 > Date.now()) return token.current;
+    try {
+      const raw = localStorage.getItem(TOKEN_KEY);
+      if (raw) {
+        const c = JSON.parse(raw) as { token: string; expiresAt: number };
+        if (c.token && c.expiresAt - 60_000 > Date.now()) {
+          token.current = c.token;
+          tokenExp.current = c.expiresAt;
+          return c.token;
+        }
+      }
+    } catch {
+      /* egal */
+    }
+    return null;
   }, []);
+
+  // Token besorgen: zuerst gecachtes gültiges Token, sonst Google fragen (still/consent).
+  const getToken = useCallback(
+    async (interactive: boolean) => {
+      if (!interactive) {
+        const v = validToken();
+        if (v) return v; // kein Google-Aufruf, kein Popup
+      }
+      const r = await requestToken(GOOGLE_CLIENT_ID, interactive);
+      token.current = r.token;
+      tokenExp.current = r.expiresAt;
+      try {
+        localStorage.setItem(TOKEN_KEY, JSON.stringify({ token: r.token, expiresAt: r.expiresAt }));
+      } catch {
+        /* egal */
+      }
+      return r.token;
+    },
+    [validToken],
+  );
 
   // Vollständiger Abgleich: Datei sicherstellen -> lesen -> mergen -> zurückschreiben
   const doSync = useCallback(async () => {
@@ -93,9 +127,11 @@ export function DriveSyncProvider({ children }: { children: ReactNode }) {
   const disconnect = useCallback(() => {
     if (token.current) revokeToken(token.current);
     token.current = null;
+    tokenExp.current = 0;
     fileId.current = null;
     try {
       localStorage.removeItem(FLAG);
+      localStorage.removeItem(TOKEN_KEY);
     } catch {
       /* egal */
     }
@@ -127,10 +163,12 @@ export function DriveSyncProvider({ children }: { children: ReactNode }) {
 
   // Automatisch hochladen, wenn sich lokal etwas ändert (entprellt)
   useEffect(() => {
-    if (status !== 'connected' || !token.current || !fileId.current) return;
+    if (status !== 'connected' || !fileId.current) return;
     if (uploadTimer.current) clearTimeout(uploadTimer.current);
     uploadTimer.current = setTimeout(() => {
-      writeFile(token.current!, fileId.current!, snapshot()).then(
+      const t = validToken();
+      if (!t) return; // kein gültiges Token → wird beim nächsten Sync nachgeholt
+      writeFile(t, fileId.current!, snapshot()).then(
         () => setLastSync(Date.now()),
         (e) => {
           setError((e as Error).message);
@@ -141,7 +179,7 @@ export function DriveSyncProvider({ children }: { children: ReactNode }) {
     return () => {
       if (uploadTimer.current) clearTimeout(uploadTimer.current);
     };
-  }, [data, status, snapshot]);
+  }, [data, status, snapshot, validToken]);
 
   const value = useMemo<Ctx>(
     () => ({ enabled, status, error, lastSync, syncing, connect, disconnect, syncNow }),
