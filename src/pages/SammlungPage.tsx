@@ -41,6 +41,12 @@ const FORCE_SPINOFF = new Set(['F415']); // Birds of Prey – Nebenstory, kein T
 const isMainStory = (m: Movie, cat: string) =>
   FORCE_MAIN.has(m.id) ? true : FORCE_SPINOFF.has(m.id) ? false : m.universe === MAIN_UNIVERSE[cat];
 
+// Normale Reihen: besessene/Collection-Filme, die bewusst zu den Spin-offs gehören
+// (kein Teil der nummerierten Hauptreihe). Schlüssel = TMDB-ID.
+const FORCE_SPINOFF_TMDB = new Set<number>([
+  330459, // Rogue One: A Star Wars Story – Anthology-Film, nicht Teil der Skywalker-Saga
+]);
+
 /** Baut die Einträge einer Film-Menge: eigene Filme + Sammlungs-Teile (+ optional Ableger). */
 function entriesFromFilms(films: Movie[], data: ReturnType<typeof useData>, globalOwned: Map<number, Movie>, extraKeys: string[]): Entry[] {
   const raw = new Map<string | number, { title: string; year: string | null; poster: string | null; future: boolean; owned: Movie | null }>();
@@ -122,6 +128,7 @@ function buildSections(data: ReturnType<typeof useData>): Section[] {
     // Hauptreihe (Collection-Filme + eigene + als Hauptreihe markierte Extras) vs.
     // Spin-offs (Ableger/Serien aus den Extras ohne `main`-Flag).
     const spinIds = new Set((data.collectionExtras[key] ?? []).filter((p) => !p.main).map((p) => p.tmdbId));
+    for (const id of FORCE_SPINOFF_TMDB) spinIds.add(id);
     const main = list.filter((e) => !(e.tmdbId != null && spinIds.has(e.tmdbId)));
     const spin = list.filter((e) => e.tmdbId != null && spinIds.has(e.tmdbId));
     const groups =
@@ -382,7 +389,7 @@ export function SammlungPage() {
             const c = counts(s);
             const universe = s.key.startsWith('cat:');
             return (
-              <section key={s.key}>
+              <section key={s.key} className="rounded-2xl border border-accent/25 bg-accent/[0.03] p-3 sm:p-4">
                 <div className="mb-2 flex items-baseline justify-between">
                   <h2 className={`font-semibold text-zinc-100 ${universe ? 'text-base' : 'text-sm'}`}>{s.name}</h2>
                   <span className="text-[11px] text-zinc-500">

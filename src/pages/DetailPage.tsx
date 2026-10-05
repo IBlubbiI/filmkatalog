@@ -117,7 +117,7 @@ function CastModal({ actor, currentGid, onClose }: { actor: CastMember; currentG
         {person?.bio && <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-zinc-300">{person.bio}</p>}
 
         <h4 className="mb-2 mt-5 text-xs font-semibold uppercase tracking-wide text-accent/80">
-          {appearances.length > 0 ? `Weitere Filme in deiner Sammlung (${appearances.length})` : 'Weitere Filme in deiner Sammlung'}
+          Spielt in weiteren Filmen in deiner Sammlung{appearances.length > 0 ? ` (${appearances.length})` : ''}
         </h4>
         {appearances.length === 0 ? (
           <p className="pb-2 text-sm text-zinc-500">Keine weiteren Titel mit {actor.name} in der Sammlung.</p>
