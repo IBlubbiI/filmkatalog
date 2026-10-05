@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'r
 import { Link } from 'react-router-dom';
 import { useData } from '../lib/data';
 import { PosterImage } from '../components/PosterImage';
-import { IconChevronLeft, IconSearch, IconClose } from '../components/Icons';
+import { IconChevronLeft, IconSearch, IconClose, IconDisc } from '../components/Icons';
 import { formatBadges } from '../lib/format';
 import type { Movie } from '../types';
 
@@ -103,7 +103,18 @@ function buildSections(data: ReturnType<typeof useData>): Section[] {
   for (const [key, { name, films }] of byKey) {
     const list = entriesFromFilms(films, data, globalOwned, [key]);
     if (list.length < 2) continue;
-    universes.push({ key, name, groups: [{ label: '', list }] });
+    // Hauptreihe (Collection-Filme + eigene) vs. Spin-offs (Ableger/Serien aus den Extras)
+    const extraIds = new Set((data.collectionExtras[key] ?? []).map((p) => p.tmdbId));
+    const main = list.filter((e) => !(e.tmdbId != null && extraIds.has(e.tmdbId)));
+    const spin = list.filter((e) => e.tmdbId != null && extraIds.has(e.tmdbId));
+    const groups =
+      main.length && spin.length
+        ? [
+            { label: 'Hauptreihe', list: main },
+            { label: 'Spin-offs & weitere Filme', list: spin },
+          ]
+        : [{ label: '', list }];
+    universes.push({ key, name, groups });
   }
   // Universen + Reihen gemeinsam alphabetisch (Marvel/DC bekommen keine Sonderstellung).
   universes.sort((a, b) => a.name.localeCompare(b.name, 'de'));
@@ -295,7 +306,12 @@ export function SammlungPage() {
             </Link>
             <h1 className="text-lg font-bold">Sammlung</h1>
           </div>
-          <span className="text-[11px] text-zinc-500">{sections.length} Reihen</span>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-zinc-500">{sections.length} Reihen</span>
+            <Link to="/verwalten" className="rounded-full p-1.5 text-zinc-500 hover:bg-ink-800 hover:text-zinc-300" aria-label="Verwalten" title="Verwalten">
+              <IconDisc width={18} height={18} />
+            </Link>
+          </div>
         </div>
         <div className="relative">
           <IconSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />

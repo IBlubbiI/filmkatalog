@@ -93,14 +93,22 @@ export function DiscoverPage() {
 
         <Cast cast={entry.cast} />
 
-        <a
-          href={`https://www.themoviedb.org/${isTv ? 'tv' : 'movie'}/${entry.tmdbId}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-6 inline-block rounded-lg bg-ink-800 px-4 py-2 text-sm text-accent-soft hover:bg-ink-700"
-        >
-          Auf TMDB ansehen ↗
-        </a>
+        <div className="mt-6 flex flex-wrap gap-2">
+          <Link
+            to={`/verwalten?add=${entry.tmdbId}&type=${isTv ? 'tv' : 'movie'}`}
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-ink-950 hover:bg-accent-soft"
+          >
+            + Zur Sammlung hinzufügen
+          </Link>
+          <a
+            href={`https://www.themoviedb.org/${isTv ? 'tv' : 'movie'}/${entry.tmdbId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-lg bg-ink-800 px-4 py-2 text-sm text-accent-soft hover:bg-ink-700"
+          >
+            Auf TMDB ansehen ↗
+          </a>
+        </div>
         <p className="mt-3 text-[11px] text-zinc-600">Infos von TMDB · Titel (noch) nicht in deiner Sammlung.</p>
       </div>
     </div>

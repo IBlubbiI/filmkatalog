@@ -1,8 +1,11 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useData } from '../lib/data';
-import { admin, checkPassword, fetchRow, type MovieRow, type TmdbHit } from '../lib/admin';
+import { admin, checkPassword, fetchRow, fetchAllRows, type MovieRow, type TmdbHit } from '../lib/admin';
 import { IconChevronLeft, IconSearch, IconClose } from '../components/Icons';
+
+// Felder, die individuell sind → keine Vorschlagsliste.
+const NO_SUGGEST = new Set(['title_de', 'title_original', 'ean', 'bonus', 'other_copies', 'year', 'discs', 'runtime_min', 'rating']);
 
 type Field = { k: string; l: string; t: 'text' | 'number' | 'select'; o?: string[] };
 const GROUPS: { group: string; items: Field[] }[] = [
@@ -78,16 +81,67 @@ export function VerwaltenPage() {
   const [hits, setHits] = useState<TmdbHit[]>([]);
   const [form, setForm] = useState<MovieRow | null>(null);
   const [editQuery, setEditQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<Record<string, string[]>>({});
+  const [sp] = useSearchParams();
+  const autoDone = useRef(false);
+
+  // Bestehende Feldwerte für Vorschlagslisten laden (öffentlich lesbar, kein Passwort).
+  useEffect(() => {
+    fetchAllRows()
+      .then((rows) => {
+        const acc: Record<string, Set<string>> = {};
+        for (const r of rows)
+          for (const [k, v] of Object.entries(r)) {
+            if (NO_SUGGEST.has(k) || v == null || v === '') continue;
+            (acc[k] ||= new Set()).add(String(v));
+          }
+        const out: Record<string, string[]> = {};
+        for (const [k, s] of Object.entries(acc)) out[k] = [...s].sort((a, b) => a.localeCompare(b, 'de'));
+        setSuggestions(out);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Von der Detailseite kommend: ?edit=F123 bearbeiten, ?add=<tmdbId>&type=… anlegen.
+  useEffect(() => {
+    if (!pw || autoDone.current) return;
+    const editId = sp.get('edit');
+    const addId = sp.get('add');
+    if (!editId && !addId) return;
+    autoDone.current = true;
+    (async () => {
+      setBusy(true);
+      try {
+        if (editId) {
+          const row = await fetchRow(editId);
+          if (row) {
+            setForm(row);
+            setTab('add');
+          } else setMsg({ t: 'err', s: 'Datensatz nicht gefunden' });
+        } else if (addId) {
+          const type = sp.get('type') === 'tv' ? 'tv' : 'movie';
+          const [d, id] = await Promise.all([admin.detail(Number(addId), type, pw), admin.nextId(pw)]);
+          setForm({
+            id, tmdb_override: Number(addId), title_de: d.title || '', title_original: d.original_title || '', year: d.year || '',
+            director: d.director || '', genre: d.genres.join(', '), main_genre: d.genres[0] || '', runtime_min: d.runtime || '', type: type === 'tv' ? 'Serie' : 'Film',
+          });
+        }
+      } catch (e) {
+        setMsg({ t: 'err', s: String((e as Error).message || e) });
+      } finally {
+        setBusy(false);
+      }
+    })();
+  }, [pw, sp]);
 
   // WICHTIG: alle Hooks (auch dieses useMemo) VOR dem vorzeitigen Passwort-Return,
   // sonst ändert sich die Hook-Anzahl beim Entsperren → React-Fehler / leere Ansicht.
   const editList = useMemo(() => {
     const q = editQuery.trim().toLowerCase();
-    const prim = [...data.groups.values()].map((g) => g[0]);
-    return prim
-      .filter((m) => !q || m.title.toLowerCase().includes(q))
-      .sort((a, b) => a.title.localeCompare(b.title, 'de'))
-      .slice(0, q ? 60 : 0);
+    return [...data.groups.values()]
+      .map((g) => g[0])
+      .filter((m) => !q || m.title.toLowerCase().includes(q) || m.id.toLowerCase().includes(q))
+      .sort((a, b) => a.title.localeCompare(b.title, 'de'));
   }, [data.groups, editQuery]);
 
   const say = (t: 'ok' | 'err', s: string) => {
@@ -264,10 +318,11 @@ export function VerwaltenPage() {
             <IconSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
             <input value={editQuery} onChange={(e) => setEditQuery(e.target.value)} placeholder="Eigenen Film suchen (Titel)…" className="w-full rounded-xl border border-ink-700 bg-ink-800 py-2.5 pl-10 pr-3 text-sm focus:border-accent/60" />
           </div>
-          <div className="mt-3 divide-y divide-ink-800">
-            {editQuery.trim() === '' && <p className="py-6 text-center text-sm text-zinc-500">Tippe einen Titel ein, um zu bearbeiten oder zu entfernen.</p>}
+          <p className="mt-2 text-[11px] text-zinc-500">{editList.length} Titel</p>
+          <div className="mt-1 max-h-[65vh] divide-y divide-ink-800 overflow-y-auto rounded-lg border border-ink-800">
+            {editList.length === 0 && <p className="py-6 text-center text-sm text-zinc-500">Keine Treffer.</p>}
             {editList.map((m) => (
-              <div key={m.id} className="flex items-center justify-between gap-2 py-2">
+              <div key={m.id} className="flex items-center justify-between gap-2 px-2 py-2">
                 <span className="min-w-0 truncate text-sm">
                   <span className="text-zinc-500">{m.id}</span> · {m.title} {m.year && <span className="text-zinc-500">({m.year})</span>}
                 </span>
@@ -302,7 +357,22 @@ export function VerwaltenPage() {
                         {f.o!.map((o) => <option key={o} value={o}>{o || '—'}</option>)}
                       </select>
                     ) : (
-                      <input type={f.t === 'number' ? 'number' : 'text'} value={String(form[f.k] ?? '')} onChange={(e) => set(f.k, e.target.value)} className="w-full rounded-lg border border-ink-700 bg-ink-800 px-2 py-1.5 text-sm focus:border-accent/60" />
+                      <>
+                        <input
+                          type={f.t === 'number' ? 'number' : 'text'}
+                          value={String(form[f.k] ?? '')}
+                          onChange={(e) => set(f.k, e.target.value)}
+                          list={f.t === 'text' && suggestions[f.k]?.length ? `dl-${f.k}` : undefined}
+                          className="w-full rounded-lg border border-ink-700 bg-ink-800 px-2 py-1.5 text-sm focus:border-accent/60"
+                        />
+                        {f.t === 'text' && suggestions[f.k]?.length ? (
+                          <datalist id={`dl-${f.k}`}>
+                            {suggestions[f.k].map((v) => (
+                              <option key={v} value={v} />
+                            ))}
+                          </datalist>
+                        ) : null}
+                      </>
                     )}
                   </label>
                 ))}

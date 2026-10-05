@@ -222,13 +222,21 @@ export function DetailPage() {
         >
           <IconChevronLeft width={18} height={18} /> Zurück
         </button>
-        <Link
-          to="/"
-          className="absolute right-3 top-3 inline-flex items-center justify-center rounded-full bg-black/50 p-2 text-zinc-100 backdrop-blur-sm hover:bg-black/70"
-          aria-label="Zur Startseite"
-        >
-          <IconHome width={18} height={18} />
-        </Link>
+        <div className="absolute right-3 top-3 flex items-center gap-2">
+          <Link
+            to={`/verwalten?edit=${movie.id}`}
+            className="inline-flex items-center rounded-full bg-black/50 px-3 py-1.5 text-xs text-zinc-100 backdrop-blur-sm hover:bg-black/70"
+          >
+            Bearbeiten
+          </Link>
+          <Link
+            to="/"
+            className="inline-flex items-center justify-center rounded-full bg-black/50 p-2 text-zinc-100 backdrop-blur-sm hover:bg-black/70"
+            aria-label="Zur Startseite"
+          >
+            <IconHome width={18} height={18} />
+          </Link>
+        </div>
       </div>
 
       <div className="px-4">

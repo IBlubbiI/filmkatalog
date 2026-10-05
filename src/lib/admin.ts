@@ -45,12 +45,19 @@ export const admin = {
 // Prüft das Passwort über eine harmlose Aktion (next_id). Wirft bei falschem Passwort.
 export const checkPassword = (pw: string) => admin.nextId(pw).then(() => true);
 
+const READ_H = { Authorization: `Bearer ${SUPABASE_ANON_KEY}`, apikey: SUPABASE_ANON_KEY };
+
 // Eine Roh-Zeile direkt aus Supabase lesen (öffentlich lesbar).
 export async function fetchRow(id: string): Promise<MovieRow | null> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/movies?id=eq.${encodeURIComponent(id)}&select=*`, {
-    headers: { Authorization: `Bearer ${SUPABASE_ANON_KEY}`, apikey: SUPABASE_ANON_KEY },
-  });
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/movies?id=eq.${encodeURIComponent(id)}&select=*`, { headers: READ_H });
   if (!res.ok) return null;
   const rows = await res.json();
   return rows[0] ?? null;
+}
+
+// Alle Zeilen lesen (für Autovervollständigung bestehender Feldwerte).
+export async function fetchAllRows(): Promise<MovieRow[]> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/movies?select=*`, { headers: { ...READ_H, Range: '0-9999', 'Range-Unit': 'items' } });
+  if (!res.ok) return [];
+  return res.json();
 }
