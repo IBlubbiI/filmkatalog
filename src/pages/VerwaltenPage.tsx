@@ -299,8 +299,40 @@ export function VerwaltenPage() {
       say('ok', 'Felder aus dem Foto übernommen – bitte prüfen/ergänzen und ggf. per TMDB-Suche das Poster zuordnen.');
     });
 
+  // Scan in ein bereits offenes Formular einmischen (Titel/Jahr von TMDB behalten).
+  const onScanIntoForm = (file: File) =>
+    run(async () => {
+      const img = await scaledBase64(file);
+      const fields = (await admin.scan(img.data, img.mime, PW)) as MovieRow;
+      setForm((cur) => {
+        const base = cur || {};
+        const keep = base.tmdb_override ? new Set(['title_de', 'title_original', 'year', 'director', 'genre']) : new Set<string>();
+        const out: MovieRow = { ...base };
+        for (const [k, v] of Object.entries(fields)) {
+          if (v == null || v === '' || k === 'id' || k === 'tmdb_override') continue;
+          if (keep.has(k) && base[k]) continue; // vorhandenen TMDB-Wert nicht überschreiben
+          out[k] = v as string | number;
+        }
+        return out;
+      });
+      say('ok', 'Felder aus dem Foto ins Formular übernommen (bitte prüfen).');
+    });
+
   return (
     <div className="mx-auto max-w-4xl px-4 pb-28">
+      {/* Ein einziger Datei-Input für beide Scan-Wege: neues Formular (onScan) bzw. offenes Formular ergänzen (onScanIntoForm). */}
+      <input
+        ref={scanInput}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) (form ? onScanIntoForm(file) : onScan(file));
+          e.target.value = '';
+        }}
+      />
       <header className="sticky top-0 z-10 -mx-4 flex items-center justify-between gap-2 bg-ink-900/90 px-4 py-3 backdrop-blur-md">
         <div className="flex items-center gap-2">
           <button
@@ -367,18 +399,6 @@ export function VerwaltenPage() {
               📷 Rückseite scannen
             </button>
             <span className="text-[11px] text-zinc-600">Foto aufnehmen/hochladen → Felder automatisch vorausfüllen</span>
-            <input
-              ref={scanInput}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) onScan(file);
-                e.target.value = '';
-              }}
-            />
           </div>
           <div className="mt-3 space-y-2">
             {hits.map((h) => (
@@ -428,7 +448,17 @@ export function VerwaltenPage() {
             <h2 className="text-sm font-semibold">
               {form.id} {form.tmdb_override ? <span className="text-zinc-500">· TMDB {String(form.tmdb_override)}</span> : null}
             </h2>
-            <button onClick={() => setForm(null)} className="rounded-full p-1 text-zinc-500 hover:bg-ink-700" aria-label="Schließen"><IconClose width={16} height={16} /></button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => scanInput.current?.click()}
+                disabled={busy}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-ink-700 bg-ink-800 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-ink-700 disabled:opacity-50"
+                title="Rückseite fotografieren → erkannte Felder ins Formular übernehmen"
+              >
+                📷 Rückseite scannen
+              </button>
+              <button onClick={() => setForm(null)} className="rounded-full p-1 text-zinc-500 hover:bg-ink-700" aria-label="Schließen"><IconClose width={16} height={16} /></button>
+            </div>
           </div>
           {GROUPS.map((g) => (
             <div key={g.group} className="mb-4">

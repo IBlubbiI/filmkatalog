@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
       case 'scan': {
         const gkey = Deno.env.get('GEMINI_API_KEY');
         if (!gkey) return json({ error: 'GEMINI_API_KEY nicht gesetzt' }, 500);
-        const model = Deno.env.get('GEMINI_MODEL') || 'gemini-2.0-flash';
+        const model = Deno.env.get('GEMINI_MODEL') || 'gemini-3.8-flash';
         const prompt =
           'Du erhältst ein Foto der Rückseite (oder Vorderseite) einer Film-Disc (DVD/Blu-ray/4K UHD). ' +
           'Lies alle erkennbaren Angaben aus und gib NUR ein JSON-Objekt mit genau diesen Schlüsseln zurück ' +
