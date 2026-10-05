@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useData } from '../lib/data';
 import { useCatalog } from '../lib/catalogState';
 import { useUserData } from '../lib/userData';
 import { PosterImage } from '../components/PosterImage';
 import { backdropUrl, formatRuntime, ratingPercent, yearLabel, fskLabel } from '../lib/format';
-import { IconChevronLeft, IconStar, IconHome, IconCheck } from '../components/Icons';
+import { IconChevronLeft, IconStar, IconHome, IconCheck, IconClose } from '../components/Icons';
 import type { Movie, CastMember } from '../types';
 
 function CastAvatar({ c }: { c: CastMember }) {
@@ -23,21 +23,95 @@ function CastAvatar({ c }: { c: CastMember }) {
   );
 }
 
-function CastRow({ cast }: { cast: CastMember[] }) {
+function CastRow({ cast, onSelect }: { cast: CastMember[]; onSelect: (c: CastMember) => void }) {
   if (!cast?.length) return null;
   return (
     <section className="mt-5">
       <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-accent/80">Besetzung</h2>
       <div className="no-scrollbar flex gap-3 overflow-x-auto pb-1">
         {cast.map((c, i) => (
-          <div key={i} className="w-16 shrink-0">
+          <button key={i} onClick={() => onSelect(c)} className="w-16 shrink-0 text-left outline-none">
             <CastAvatar c={c} />
-            <p className="mt-1 truncate text-center text-[11px] font-medium text-zinc-200">{c.name}</p>
+            <p className="mt-1 truncate text-center text-[11px] font-medium text-zinc-200 group-hover:text-accent-soft">{c.name}</p>
             {c.character && <p className="truncate text-center text-[10px] text-zinc-500">{c.character}</p>}
-          </div>
+          </button>
         ))}
       </div>
     </section>
+  );
+}
+
+/** Popup zu einem Darsteller: Rolle + weitere Filme dieser Person in der Sammlung. */
+function CastModal({ actor, currentGid, onClose }: { actor: CastMember; currentGid: string; onClose: () => void }) {
+  const data = useData();
+  const photo = actor.profile ? `https://image.tmdb.org/t/p/w185${actor.profile}` : null;
+  const tmdbSearch = `https://www.themoviedb.org/search?query=${encodeURIComponent(actor.name)}`;
+  const appearances = useMemo(() => {
+    const seen = new Set<string>();
+    const out: { movie: Movie; character: string | null }[] = [];
+    for (const m of data.movies) {
+      const hit = m.tmdb?.cast?.find((c) => c.name === actor.name);
+      if (!hit) continue;
+      const gid = m.groupId ?? m.id;
+      if (gid === currentGid || seen.has(gid)) continue;
+      seen.add(gid);
+      out.push({ movie: (m.groupId && data.groups.get(m.groupId)?.[0]) || m, character: hit.character });
+    }
+    return out.sort((a, b) => (a.movie.year ?? 9999) - (b.movie.year ?? 9999));
+  }, [data, actor.name, currentGid]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4" onClick={onClose}>
+      <div
+        className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-ink-850 p-4 ring-1 ring-white/10 sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start gap-3">
+          {photo ? (
+            <img src={photo} alt="" className="h-24 w-16 shrink-0 rounded-lg object-cover" />
+          ) : (
+            <div className="flex h-24 w-16 shrink-0 items-center justify-center rounded-lg bg-ink-700 text-sm font-bold text-zinc-400">
+              {actor.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('')}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <h3 className="text-base font-bold leading-tight">{actor.name}</h3>
+            {actor.character && <p className="text-sm text-zinc-400">als {actor.character}</p>}
+            <a href={tmdbSearch} target="_blank" rel="noopener noreferrer" className="mt-1.5 inline-block text-xs text-accent-soft hover:underline">
+              Mehr zu {actor.name} bei TMDB →
+            </a>
+          </div>
+          <button onClick={onClose} className="rounded-full p-1 text-zinc-500 hover:bg-ink-700" aria-label="Schließen">
+            <IconClose width={18} height={18} />
+          </button>
+        </div>
+
+        <h4 className="mb-2 mt-5 text-xs font-semibold uppercase tracking-wide text-accent/80">
+          {appearances.length > 0 ? `Weitere Filme in deiner Sammlung (${appearances.length})` : 'Weitere Filme in deiner Sammlung'}
+        </h4>
+        {appearances.length === 0 ? (
+          <p className="pb-2 text-sm text-zinc-500">Keine weiteren Titel mit {actor.name} in der Sammlung.</p>
+        ) : (
+          <div className="grid grid-cols-4 gap-3 sm:grid-cols-5">
+            {appearances.map(({ movie, character }) => (
+              <Link key={movie.id} to={`/film/${movie.id}`} onClick={onClose} className="block">
+                <div className="overflow-hidden rounded-lg ring-1 ring-white/5">
+                  <PosterImage movie={movie} />
+                </div>
+                <p className="mt-1 truncate text-[11px] text-zinc-300">{movie.title}</p>
+                {character && <p className="truncate text-[10px] text-zinc-500">{character}</p>}
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -147,6 +221,7 @@ export function DetailPage() {
   const data = useData();
   const { showFranchise, showDirector } = useCatalog();
   const movie = id ? data.byId.get(id) : undefined;
+  const [castSel, setCastSel] = useState<CastMember | null>(null);
 
   const goFranchise = (name: string) => {
     showFranchise(name);
@@ -315,7 +390,7 @@ export function DetailPage() {
         {movie.tmdb?.overview && <p className="mt-5 text-sm leading-relaxed text-zinc-300">{movie.tmdb.overview}</p>}
 
         {/* Besetzung */}
-        <CastRow cast={movie.tmdb?.cast ?? []} />
+        <CastRow cast={movie.tmdb?.cast ?? []} onSelect={setCastSel} />
 
         {/* Technik */}
         <Block title="Bild & Ton">
@@ -409,6 +484,8 @@ export function DetailPage() {
 
         <p className="mt-8 text-center text-[11px] text-zinc-600">{movie.id}</p>
       </div>
+
+      {castSel && <CastModal actor={castSel} currentGid={movie.groupId ?? movie.id} onClose={() => setCastSel(null)} />}
     </div>
   );
 }
