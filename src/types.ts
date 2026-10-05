@@ -68,6 +68,8 @@ export interface Movie {
   location: string | null;
   seen: boolean | null;
   rating: number | null;
+  /** Zur Laufzeit aus den App-Daten überlagert (für Sortierung „Gesehen"). */
+  watchCount?: number;
   lentTo: string | null;
   type: 'Film' | 'Serie';
   duplicateIds: string[];

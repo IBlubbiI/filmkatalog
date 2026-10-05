@@ -114,14 +114,21 @@ Deno.serve(async (req) => {
         const model = Deno.env.get('GEMINI_MODEL') || 'gemini-3.8-flash';
         const prompt =
           'Du erhältst ein Foto der Rückseite (oder Vorderseite) einer Film-Disc (DVD/Blu-ray/4K UHD). ' +
-          'Lies alle erkennbaren Angaben aus und gib NUR ein JSON-Objekt mit genau diesen Schlüsseln zurück ' +
-          '(Werte, die nicht erkennbar sind, als leeren String ""): ' +
+          'Lies alle erkennbaren Angaben aus und gib NUR ein JSON-Objekt mit genau diesen Schlüsseln zurück: ' +
           'title_de, title_original, year, director, disc_format, discs, native_4k, hdr, atmos, aspect_ratio, ' +
           'fsk, runtime_min, label, edition, ean, audio_ov, audio_de, subtitles_de, genre, bonus. ' +
-          'Regeln: disc_format z.B. "4K UHD + Blu-ray" oder "Blu-ray"; native_4k und atmos jeweils "Ja" oder "Nein"; ' +
-          'hdr z.B. "Dolby Vision, HDR10"; aspect_ratio z.B. "2.39:1"; year als vierstellige Zahl; ' +
-          'runtime_min als Zahl (Minuten); ean nur Ziffern; audio_ov = beste Original-Tonspur, audio_de = beste deutsche Tonspur; ' +
-          'genre als kommagetrennte Liste. Antworte ausschließlich mit dem JSON.';
+          'WICHTIG: Was nicht klar erkennbar ist, als leeren String "" zurückgeben – NIEMALS Platzhalter wie ' +
+          '"nicht ermittelt", "unbekannt" oder erklärende Sätze. Nur der reine Wert oder "". ' +
+          'Normiere die Werte kanonisch: ' +
+          'disc_format z.B. "4K UHD + Blu-ray", "Blu-ray", "Blu-ray + DVD", "DVD". ' +
+          'native_4k und atmos jeweils "Ja" oder "Nein". ' +
+          'hdr nur die Formate, z.B. "Dolby Vision, HDR10", "HDR10", "HDR10+". ' +
+          'aspect_ratio als reines Verhältnis, z.B. "2.39:1", "1.85:1", "1.78:1 (16:9)" – ohne Zusatztext. ' +
+          'fsk nur die Zahl (0/6/12/16/18). year vierstellige Zahl. runtime_min Zahl in Minuten. ean nur Ziffern. ' +
+          'audio_ov = beste Original-Tonspur, audio_de = beste deutsche Tonspur – jeweils NUR das Tonformat OHNE Sprache, ' +
+          'z.B. "Dolby Atmos", "DTS-HD MA 7.1", "DTS-HD MA 5.1", "Dolby Digital 5.1", "Dolby Digital 2.0". ' +
+          'subtitles_de z.B. "Deutsch" oder "" wenn keine. genre als kommagetrennte deutsche Genres. ' +
+          'Antworte ausschließlich mit dem JSON.';
         const gbody = {
           contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: body.mime || 'image/jpeg', data: body.image } }] }],
           generationConfig: { responseMimeType: 'application/json', temperature: 0 },

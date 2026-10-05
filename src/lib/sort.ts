@@ -8,6 +8,8 @@ export type SortKey =
   | 'yearAsc'
   | 'tmdbRating'
   | 'myRating'
+  | 'seenDesc'
+  | 'seenAsc'
   | 'runtimeAsc'
   | 'runtimeDesc';
 
@@ -19,9 +21,14 @@ export const SORTS: { key: SortKey; label: string }[] = [
   { key: 'yearAsc', label: 'Jahr (alt → neu)' },
   { key: 'tmdbRating', label: 'TMDB-Rating' },
   { key: 'myRating', label: 'Meine Bewertung' },
+  { key: 'seenDesc', label: 'Gesehen (oft → nie)' },
+  { key: 'seenAsc', label: 'Gesehen (nie → oft)' },
   { key: 'runtimeAsc', label: 'Laufzeit (kurz → lang)' },
   { key: 'runtimeDesc', label: 'Laufzeit (lang → kurz)' },
 ];
+
+// „Gesehen"-Zähler: expliziter watchCount, sonst 1× (gesehen) bzw. 0 (ungesehen).
+const watched = (m: Movie) => m.watchCount ?? (m.seen ? 1 : 0);
 
 // numerischer Teil der ID (F057 -> 57, F108B -> 108) für "zuletzt ergänzt"
 const idNum = (id: string) => parseInt(id.replace(/\D/g, ''), 10) || 0;
@@ -57,6 +64,12 @@ export function sortMovies(list: Movie[], key: SortKey): Movie[] {
       );
     case 'myRating':
       return arr.sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1) || collator.compare(a.title, b.title));
+    case 'seenDesc':
+      // am häufigsten gesehen zuerst, ungesehene ans Ende
+      return arr.sort((a, b) => watched(b) - watched(a) || collator.compare(a.title, b.title));
+    case 'seenAsc':
+      // noch nicht/selten gesehen zuerst
+      return arr.sort((a, b) => watched(a) - watched(b) || collator.compare(a.title, b.title));
     case 'runtimeAsc':
       return arr.sort((a, b) => nl(a.runtime, 1) - nl(b.runtime, 1) || collator.compare(a.title, b.title));
     case 'runtimeDesc':

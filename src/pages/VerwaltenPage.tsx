@@ -6,7 +6,29 @@ import { IconChevronLeft, IconSearch, IconClose } from '../components/Icons';
 import { SectionNav } from '../components/SectionNav';
 
 // Felder, die individuell sind → keine Vorschlagsliste.
-const NO_SUGGEST = new Set(['title_de', 'title_original', 'ean', 'bonus', 'other_copies', 'year', 'discs', 'runtime_min', 'rating']);
+const NO_SUGGEST = new Set(['title_de', 'title_original', 'ean', 'bonus', 'other_copies', 'year', 'discs', 'runtime_min', 'rating', 'genre']);
+
+// Kuratierte, kanonische Wertelisten – zeigen die TATSÄCHLICH existierenden Formate
+// statt jeder je erfassten Schreibweise. Vorschläge = diese Liste + echte Bestandswerte.
+const AUDIO = [
+  'Dolby Atmos', 'DTS:X', 'Dolby TrueHD 7.1', 'Dolby TrueHD 5.1', 'DTS-HD MA 7.1', 'DTS-HD MA 5.1', 'DTS-HD MA 2.0',
+  'DTS 5.1', 'DTS 2.0', 'Dolby Digital Plus 5.1', 'Dolby Digital 5.1', 'Dolby Digital 2.0', 'LPCM 5.1', 'LPCM 2.0', 'Mono',
+];
+const CURATED: Record<string, string[]> = {
+  aspect_ratio: ['1.33:1 (4:3)', '1.37:1', '1.66:1', '1.78:1 (16:9)', '1.85:1', '2.00:1', '2.20:1', '2.35:1', '2.39:1', '2.40:1', '2.76:1'],
+  disc_format: ['4K UHD', '4K UHD + Blu-ray', '4K UHD + Blu-ray + DVD', 'Blu-ray', 'Blu-ray + DVD', 'Blu-ray 3D + Blu-ray', 'DVD'],
+  hdr: ['Dolby Vision', 'HDR10', 'HDR10+', 'Dolby Vision, HDR10', 'Dolby Vision, HDR10+', 'HDR10, HDR10+', 'Dolby Vision, HDR10, HDR10+'],
+  fsk: ['0', '6', '12', '16', '18'],
+  audio_ov: AUDIO,
+  audio_de: AUDIO,
+  subtitles_de: ['Deutsch', 'Deutsch (SDH)', 'Deutsch, Englisch'],
+  main_genre: ['Action', 'Abenteuer', 'Animation', 'Komödie', 'Krimi', 'Dokumentarfilm', 'Drama', 'Familie', 'Fantasy', 'Historie', 'Horror', 'Musik', 'Mystery', 'Liebesfilm', 'Science Fiction', 'Thriller', 'Kriegsfilm', 'Western', 'TV-Film'],
+};
+// „Nicht-Werte" (so gut wie leer) – nie als Vorschlag anzeigen.
+const JUNK = /nicht ermittelt|nicht explizit|nicht filmgenau|nicht angegeben|nicht sichtbar|unbekannt|keine angabe|siehe |n\/?a\b|entf[äa]llt|^[–\-.\s]+$/i;
+const isJunk = (v: string) => !v.trim() || JUNK.test(v);
+// Label: „Blumhouse / Universal Pictures" → einzelne Labels, damit jedes separat wählbar ist.
+const splitAtomic = (v: string) => v.split(/\s*[/,]\s*/).map((s) => s.trim()).filter(Boolean);
 
 type Field = { k: string; l: string; t: 'text' | 'number' | 'select'; o?: string[] };
 const GROUPS: { group: string; items: Field[] }[] = [
@@ -113,17 +135,30 @@ export function VerwaltenPage() {
   const scanInput = useRef<HTMLInputElement>(null);
 
   // Bestehende Feldwerte für Vorschlagslisten laden (öffentlich lesbar, kein Passwort).
+  // Kuratierte Felder: kanonische Liste + echte Bestandswerte; „Nicht-Werte" fliegen raus.
   useEffect(() => {
     fetchAllRows()
       .then((rows) => {
         const acc: Record<string, Set<string>> = {};
         for (const r of rows)
           for (const [k, v] of Object.entries(r)) {
-            if (NO_SUGGEST.has(k) || v == null || v === '') continue;
-            (acc[k] ||= new Set()).add(String(v));
+            if (NO_SUGGEST.has(k) || v == null) continue;
+            const raw = String(v);
+            if (isJunk(raw)) continue;
+            const vals = k === 'label' ? splitAtomic(raw) : [raw];
+            for (const val of vals) if (!isJunk(val)) (acc[k] ||= new Set()).add(val);
           }
         const out: Record<string, string[]> = {};
-        for (const [k, s] of Object.entries(acc)) out[k] = [...s].sort((a, b) => a.localeCompare(b, 'de'));
+        for (const k of new Set([...Object.keys(acc), ...Object.keys(CURATED)])) {
+          const derived = [...(acc[k] || [])];
+          if (CURATED[k]) {
+            // kanonische Werte zuerst, danach echte Extra-Werte (alphabetisch)
+            const extra = derived.filter((v) => !CURATED[k].includes(v)).sort((a, b) => a.localeCompare(b, 'de'));
+            out[k] = [...CURATED[k], ...extra];
+          } else {
+            out[k] = derived.sort((a, b) => a.localeCompare(b, 'de'));
+          }
+        }
         setSuggestions(out);
       })
       .catch(() => {});

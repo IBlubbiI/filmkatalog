@@ -39,7 +39,7 @@ export function CatalogPage() {
       data.movies.map((m) => {
         const u = userData[m.id];
         if (!u) return m;
-        return { ...m, seen: u.seen ?? m.seen, rating: u.rating ?? m.rating };
+        return { ...m, seen: u.seen ?? m.seen, rating: u.rating ?? m.rating, watchCount: u.watchCount ?? (u.seen ?? m.seen ? 1 : 0) };
       }),
     [data.movies, userData],
   );
@@ -85,10 +85,7 @@ export function CatalogPage() {
             </button>
           )}
         </div>
-      </header>
-
-      <div className="px-4">
-        <div className="flex items-center justify-between gap-2 py-2.5">
+        <div className="mt-2 flex items-center justify-between gap-2">
           <div className="flex rounded-lg border border-ink-700 bg-ink-800 p-0.5">
             <button onClick={() => setView('grid')} className={`rounded-md p-1.5 ${view === 'grid' ? 'bg-ink-700 text-accent-soft' : 'text-zinc-400'}`} aria-label="Raster">
               <IconGrid width={18} height={18} />
@@ -113,7 +110,9 @@ export function CatalogPage() {
             </select>
           </label>
         </div>
+      </header>
 
+      <div className="px-4">
         <ActiveChips state={filters} setState={setFilters} />
 
         <p className="py-2 text-xs text-zinc-500">
