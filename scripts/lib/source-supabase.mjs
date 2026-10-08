@@ -45,6 +45,7 @@ const COLMAP = {
   type: 'Typ',
   other_copies: 'Weitere Exemplare (IDs)',
   category: 'Kategorie',
+  poster_url: 'Poster-URL',
 };
 
 const KEY = () => process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_KEY || null;

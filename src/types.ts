@@ -75,6 +75,7 @@ export interface Movie {
   watchCount?: number;
   lentTo: string | null;
   type: 'Film' | 'Serie';
+  posterUrl: string | null; // eigenes hochgeladenes Poster (Supabase Storage) – überschreibt TMDB
   duplicateIds: string[];
   tmdb: Tmdb | null;
   /** Zur Laufzeit gesetzt: Schlüssel der Ausgaben-Gruppe (gleicher Film, versch. Disc). */

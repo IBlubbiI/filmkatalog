@@ -41,6 +41,8 @@ export const admin = {
   remove: (id: string, pw: string): Promise<void> => call('remove', { id }, pw).then(() => undefined),
   publish: (pw: string): Promise<void> => call('publish', {}, pw).then(() => undefined),
   scan: (image: string, mime: string, pw: string): Promise<MovieRow> => call('scan', { image, mime }, pw).then((d) => d.fields || {}),
+  uploadPoster: (id: string, image: string, mime: string, pw: string): Promise<string> =>
+    call('upload_poster', { id, image, mime }, pw).then((d) => d.url as string),
 };
 
 // Prüft das Passwort über eine harmlose Aktion (next_id). Wirft bei falschem Passwort.

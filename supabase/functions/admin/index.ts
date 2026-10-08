@@ -152,6 +152,22 @@ Deno.serve(async (req) => {
         return json({ fields });
       }
 
+      case 'upload_poster': {
+        // Eigenes Poster in den Storage-Bucket "posters" legen, öffentliche URL zurückgeben.
+        if (!body.id || !body.image) return json({ error: 'id/image fehlt' }, 400);
+        const mime = String(body.mime || 'image/jpeg');
+        const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
+        const path = `${body.id}.${ext}`;
+        const bytes = Uint8Array.from(atob(String(body.image)), (c) => c.charCodeAt(0));
+        const up = await fetch(`${SB_URL}/storage/v1/object/posters/${path}`, {
+          method: 'POST',
+          headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'content-type': mime, 'x-upsert': 'true' },
+          body: bytes,
+        });
+        if (!up.ok) return json({ error: `Storage ${up.status}: ${await up.text()}` }, 500);
+        return json({ ok: true, url: `${SB_URL}/storage/v1/object/public/posters/${path}?v=${Date.now()}` });
+      }
+
       case 'upsert': {
         const movie = body.movie || {};
         if (!movie.id) movie.id = await nextId();

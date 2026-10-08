@@ -134,6 +134,7 @@ export function VerwaltenPage() {
   const navigate = useNavigate();
   const autoDone = useRef(false);
   const scanInput = useRef<HTMLInputElement>(null);
+  const posterInput = useRef<HTMLInputElement>(null);
 
   // Bestehende Feldwerte für Vorschlagslisten laden (öffentlich lesbar, kein Passwort).
   // Kuratierte Felder: kanonische Liste + echte Bestandswerte; „Nicht-Werte" fliegen raus.
@@ -354,6 +355,16 @@ export function VerwaltenPage() {
       say('ok', 'Felder aus dem Foto ins Formular übernommen (bitte prüfen).');
     });
 
+  // Eigenes Poster hochladen (Supabase Storage) → URL ins Formular übernehmen.
+  const onPosterUpload = (file: File) =>
+    run(async () => {
+      if (!form?.id) throw new Error('Film hat keine ID');
+      const img = await scaledBase64(file, 600); // Poster etwas größer als der Scan
+      const url = await admin.uploadPoster(String(form.id), img.data, img.mime, PW);
+      setForm((f) => ({ ...(f || {}), poster_url: url }));
+      say('ok', 'Poster hochgeladen – zum Live-Schalten „Speichern" + „Veröffentlichen".');
+    });
+
   return (
     <div className="mx-auto max-w-4xl px-4 pb-28">
       {/* Ein einziger Datei-Input für beide Scan-Wege: neues Formular (onScan) bzw. offenes Formular ergänzen (onScanIntoForm). */}
@@ -366,6 +377,18 @@ export function VerwaltenPage() {
         onChange={(e) => {
           const file = e.target.files?.[0];
           if (file) (form ? onScanIntoForm(file) : onScan(file));
+          e.target.value = '';
+        }}
+      />
+      {/* Datei-Input für das eigene Poster. */}
+      <input
+        ref={posterInput}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onPosterUpload(file);
           e.target.value = '';
         }}
       />
@@ -496,6 +519,37 @@ export function VerwaltenPage() {
               <button onClick={() => setForm(null)} className="rounded-full p-1 text-zinc-500 hover:bg-ink-700" aria-label="Schließen"><IconClose width={16} height={16} /></button>
             </div>
           </div>
+          {/* Eigenes Poster (überschreibt das TMDB-Bild) */}
+          <div className="mb-4 flex items-center gap-3 rounded-lg border border-ink-800 p-3">
+            <div className="h-24 w-16 shrink-0 overflow-hidden rounded-lg bg-ink-800 ring-1 ring-white/10">
+              {form.poster_url ? (
+                <img src={String(form.poster_url)} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-2xl opacity-30">🎬</div>
+              )}
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[11px] text-zinc-500">Eigenes Poster {form.poster_url ? '(aktiv)' : '– sonst TMDB-Bild'}</span>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => posterInput.current?.click()}
+                  disabled={busy}
+                  className="rounded-lg border border-ink-700 bg-ink-800 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-ink-700 disabled:opacity-50"
+                >
+                  Bild hochladen
+                </button>
+                {form.poster_url ? (
+                  <button
+                    onClick={() => set('poster_url', '')}
+                    className="rounded-lg px-3 py-1.5 text-xs text-zinc-400 hover:bg-ink-700"
+                  >
+                    Entfernen (TMDB nutzen)
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
           {GROUPS.map((g) => (
             <div key={g.group} className="mb-4">
               <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{g.group}</h3>

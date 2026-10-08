@@ -3,6 +3,7 @@ import type { Movie } from '../types';
 const BASE = import.meta.env.BASE_URL;
 
 export function posterUrl(m: Movie): string | null {
+  if (m.posterUrl) return m.posterUrl; // eigenes hochgeladenes Poster (Supabase Storage)
   return m.tmdb?.poster ? BASE + m.tmdb.poster : null;
 }
 export function backdropUrl(m: Movie): string | null {

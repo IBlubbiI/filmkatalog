@@ -297,6 +297,7 @@ function toMovie(r) {
     })(),
     lentTo: clean(r['Verliehen an']),
     type,
+    posterUrl: clean(r['Poster-URL']), // eigenes Poster (Supabase Storage) – überschreibt TMDB
     duplicateIds: splitIds(r['Weitere Exemplare (IDs)']),
     tmdb: null, // wird ggf. unten befüllt
   };
