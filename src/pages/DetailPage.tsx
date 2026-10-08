@@ -139,9 +139,24 @@ function CastModal({ actor, currentGid, onClose }: { actor: CastMember; currentG
   );
 }
 
+// Bewertungs-Skala mit Kriterien – hilft, Filme zu differenzieren statt alles 8+ zu geben.
+const RATING_LEGEND: { n: number; label: string; hint: string }[] = [
+  { n: 10, label: 'Meisterwerk', hint: 'Prägend, (nahezu) perfekt – jederzeit wieder' },
+  { n: 9, label: 'Herausragend', hint: 'Großer Eindruck, nur Kleinigkeiten' },
+  { n: 8, label: 'Sehr gut', hint: 'Klare Empfehlung, bleibt im Kopf' },
+  { n: 7, label: 'Gut', hint: 'Gelungen & unterhaltsam, solide' },
+  { n: 6, label: 'Ordentlich', hint: 'Hat gefallen, aber vergessbar' },
+  { n: 5, label: 'Mittelmaß', hint: 'Okay – Zeitvertreib, weder noch' },
+  { n: 4, label: 'Schwächer', hint: 'Mehr Schwächen als Stärken' },
+  { n: 3, label: 'Schwach', hint: 'Kaum Positives, enttäuschend' },
+  { n: 2, label: 'Sehr schwach', hint: 'Fast durchgehend misslungen' },
+  { n: 1, label: 'Grottig', hint: 'Verschwendete Zeit' },
+];
+
 function MyRatingPanel({ movie }: { movie: Movie }) {
   const data = useData();
   const { entry, setSeen, setRating, setWatchCount } = useUserData();
+  const [showLegend, setShowLegend] = useState(false);
   // Bewertung gilt film-weit: immer am Gruppen-Primär speichern, egal welche Ausgabe offen ist
   const rid = (movie.groupId && data.groups.get(movie.groupId)?.[0]?.id) || movie.id;
   const e = entry(rid);
@@ -178,6 +193,29 @@ function MyRatingPanel({ movie }: { movie: Movie }) {
           <span>Regler ziehen zum Bewerten</span>
         )}
         <span>10,0</span>
+      </div>
+
+      <div className="mt-2">
+        <button onClick={() => setShowLegend((v) => !v)} className="text-[11px] text-zinc-500 hover:text-zinc-300">
+          {showLegend ? '▾' : '▸'} Bewertungs-Skala
+        </button>
+        {showLegend && (
+          <div className="mt-1.5 rounded-lg bg-ink-850 p-3 ring-1 ring-white/5">
+            <p className="mb-2 text-[11px] leading-relaxed text-zinc-400">
+              Tipp: <span className="text-zinc-300">7 ist schon „gut"</span> – heb dir 9–10 für die wenigen Filme auf, die dich wirklich umgehauen haben, dann bleibt Spielraum nach oben.
+              Frag dich: Würde ich ihn <em>wieder</em> sehen? Weiterempfehlen? In einem Jahr noch erinnern?
+            </p>
+            <ul className="space-y-0.5">
+              {RATING_LEGEND.map((r) => (
+                <li key={r.n} className="flex gap-2 text-[11px]">
+                  <span className="w-4 shrink-0 text-right font-bold tabular-nums text-accent-soft/90">{r.n}</span>
+                  <span className="w-[4.5rem] shrink-0 font-medium text-zinc-200">{r.label}</span>
+                  <span className="min-w-0 text-zinc-500">{r.hint}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -227,6 +265,7 @@ function NotesPanel({ movie }: { movie: Movie }) {
     }
   });
   const [text, setText] = useState('');
+  const [addingAuthor, setAddingAuthor] = useState(false);
   const authorOptions = [...new Set([...NOTE_AUTHORS, ...list.map((n) => n.author)])];
 
   const submit = () => {
@@ -246,21 +285,44 @@ function NotesPanel({ movie }: { movie: Movie }) {
       <h3 className="mb-2 text-sm font-semibold text-zinc-200">Notizen</h3>
 
       <div className="flex flex-col gap-2">
-        <label className="flex items-center gap-2">
-          <span className="w-14 shrink-0 text-xs text-zinc-500">Autor</span>
-          <input
-            value={author}
-            onChange={(e) => setAuthor(e.target.value)}
-            list="note-authors"
-            placeholder="Name"
-            className="w-40 rounded-lg border border-ink-700 bg-ink-800 px-2.5 py-1.5 text-sm focus:border-accent/60"
-          />
-          <datalist id="note-authors">
-            {authorOptions.map((a) => (
-              <option key={a} value={a} />
-            ))}
-          </datalist>
-        </label>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-0.5 text-xs text-zinc-500">Autor:</span>
+          {authorOptions.map((a) => (
+            <button
+              key={a}
+              type="button"
+              onClick={() => {
+                setAuthor(a);
+                setAddingAuthor(false);
+              }}
+              className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                !addingAuthor && author === a ? 'bg-accent/20 text-accent-soft ring-1 ring-accent/40' : 'bg-ink-700 text-zinc-300 hover:bg-ink-600'
+              }`}
+            >
+              {a}
+            </button>
+          ))}
+          {addingAuthor ? (
+            <input
+              autoFocus
+              value={author}
+              onChange={(e) => setAuthor(e.target.value)}
+              placeholder="Name"
+              className="w-28 rounded-full border border-ink-600 bg-ink-800 px-2.5 py-1 text-xs focus:border-accent/60"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setAddingAuthor(true);
+                setAuthor('');
+              }}
+              className="rounded-full px-2.5 py-1 text-xs text-zinc-400 hover:bg-ink-700"
+            >
+              ＋ Anderer
+            </button>
+          )}
+        </div>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
