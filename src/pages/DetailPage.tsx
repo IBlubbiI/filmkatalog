@@ -209,6 +209,103 @@ function MyRatingPanel({ movie }: { movie: Movie }) {
   );
 }
 
+// Vorschläge für den Autor (erweiterbar – man kann auch einen neuen Namen tippen).
+const NOTE_AUTHORS = ['Thomas', 'Hannah', 'Ursula'];
+const NOTE_AUTHOR_KEY = 'filmkatalog.note.author';
+
+function NotesPanel({ movie }: { movie: Movie }) {
+  const data = useData();
+  const { notes, addNote, deleteNote } = useUserData();
+  // Notizen gelten film-weit → immer am Gruppen-Primär speichern (wie die Bewertung).
+  const rid = (movie.groupId && data.groups.get(movie.groupId)?.[0]?.id) || movie.id;
+  const list = notes(rid);
+  const [author, setAuthor] = useState(() => {
+    try {
+      return localStorage.getItem(NOTE_AUTHOR_KEY) || NOTE_AUTHORS[0];
+    } catch {
+      return NOTE_AUTHORS[0];
+    }
+  });
+  const [text, setText] = useState('');
+  const authorOptions = [...new Set([...NOTE_AUTHORS, ...list.map((n) => n.author)])];
+
+  const submit = () => {
+    const t = text.trim();
+    if (!t) return;
+    addNote(rid, author, t);
+    setText('');
+    try {
+      if (author.trim()) localStorage.setItem(NOTE_AUTHOR_KEY, author.trim());
+    } catch {
+      /* ignore */
+    }
+  };
+
+  return (
+    <section className="mt-5 rounded-xl bg-ink-800/60 p-4 ring-1 ring-white/5">
+      <h3 className="mb-2 text-sm font-semibold text-zinc-200">Notizen</h3>
+
+      <div className="flex flex-col gap-2">
+        <label className="flex items-center gap-2">
+          <span className="w-14 shrink-0 text-xs text-zinc-500">Autor</span>
+          <input
+            value={author}
+            onChange={(e) => setAuthor(e.target.value)}
+            list="note-authors"
+            placeholder="Name"
+            className="w-40 rounded-lg border border-ink-700 bg-ink-800 px-2.5 py-1.5 text-sm focus:border-accent/60"
+          />
+          <datalist id="note-authors">
+            {authorOptions.map((a) => (
+              <option key={a} value={a} />
+            ))}
+          </datalist>
+        </label>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={3}
+          placeholder="Deine Gedanken zum Film…"
+          className="w-full resize-y rounded-lg border border-ink-700 bg-ink-800 px-3 py-2 text-sm placeholder:text-zinc-600 focus:border-accent/60"
+        />
+        <div className="flex justify-end">
+          <button
+            onClick={submit}
+            disabled={!text.trim()}
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-ink-950 hover:bg-accent-soft disabled:opacity-40"
+          >
+            Notiz hinzufügen
+          </button>
+        </div>
+      </div>
+
+      {list.length > 0 && (
+        <ul className="mt-4 space-y-2">
+          {list.map((n) => (
+            <li key={n.id} className="rounded-lg bg-ink-850 p-3 ring-1 ring-white/5">
+              <div className="mb-1 flex items-center justify-between text-xs">
+                <span className="font-semibold text-accent-soft/90">{n.author}</span>
+                <span className="text-zinc-500">{new Date(n.at).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+              </div>
+              <p className="whitespace-pre-wrap text-sm text-zinc-200">{n.text}</p>
+              <div className="mt-1 text-right">
+                <button
+                  onClick={() => {
+                    if (confirm('Notiz löschen?')) deleteNote(rid, n.id);
+                  }}
+                  className="text-[11px] text-zinc-500 hover:text-red-300"
+                >
+                  Löschen
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   if (value == null || value === '' || value === '–') return null;
   return (
@@ -390,6 +487,9 @@ export function DetailPage() {
 
         {/* Meine Bewertung / Gesehen (in der App gepflegt) */}
         <MyRatingPanel movie={movie} />
+
+        {/* Notizen / Gedanken zum Film (mit Autor, geräteübergreifend synchronisiert) */}
+        <NotesPanel movie={movie} />
 
         {/* Genres */}
         {(movie.genres.length > 0 || movie.franchise) && (

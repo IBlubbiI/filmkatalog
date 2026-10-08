@@ -1,15 +1,29 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
+// Eine Film-Notiz (mit Autor). Hat einen eigenen Zeitstempel, damit der Geräte-
+// Merge Notizen einzeln zusammenführt (nie gegenseitig überschreibt).
+export interface Note {
+  id: string;
+  author: string;
+  text: string;
+  at: number; // erstellt (ms)
+  updatedAt: number; // für Merge
+  deleted?: boolean; // Tombstone (gelöscht, aber für den Merge erhalten)
+}
+
 // Vom Nutzer in der App gepflegte Daten (auf dem Gerät gespeichert).
 export interface UserEntry {
   seen?: boolean;
   rating?: number | null; // 1.0–10.0, eine Nachkommastelle
   watchCount?: number; // wie oft gesehen (>=1)
-  updatedAt?: number; // Zeitstempel (ms) für Merge zwischen Geräten
+  notes?: Note[]; // Gedanken/Kommentare zum Film (mit Autor)
+  updatedAt?: number; // Zeitstempel (ms) für Merge der Skalar-Felder zwischen Geräten
 }
 export type UserDataMap = Record<string, UserEntry>;
 
-const hasData = (e: UserEntry) => !!e && (e.seen || e.rating != null || !!e.watchCount);
+const activeNotes = (e?: UserEntry) => (e?.notes ?? []).filter((n) => !n.deleted);
+const hasData = (e: UserEntry) => !!e && (e.seen || e.rating != null || !!e.watchCount || activeNotes(e).length > 0);
+const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
 const KEY = 'filmkatalog.userdata.v1';
 
@@ -19,6 +33,9 @@ interface Ctx {
   setSeen: (id: string, seen: boolean) => void;
   setRating: (id: string, rating: number | null) => void;
   setWatchCount: (id: string, n: number) => void;
+  notes: (id: string) => Note[]; // aktive Notizen, neueste zuerst
+  addNote: (id: string, author: string, text: string) => void;
+  deleteNote: (id: string, noteId: string) => void;
   count: number; // Anzahl Filme mit Daten
   exportJSON: () => void;
   importJSON: (file: File) => Promise<{ ok: boolean; msg: string }>;
@@ -67,6 +84,26 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
     [patch],
   );
 
+  // Notizen tragen EIGENE Zeitstempel (kein Bump von entry.updatedAt), damit der
+  // Geräte-Merge Skalar-Felder und Notizen unabhängig zusammenführt.
+  const addNote = useCallback((id: string, author: string, text: string) => {
+    const t = text.trim();
+    if (!t) return;
+    const note: Note = { id: uuid(), author: author.trim() || 'Ich', text: t, at: Date.now(), updatedAt: Date.now() };
+    setData((d) => ({ ...d, [id]: { ...d[id], notes: [...(d[id]?.notes ?? []), note] } }));
+  }, []);
+  const deleteNote = useCallback((id: string, noteId: string) => {
+    setData((d) => {
+      const e = d[id];
+      if (!e?.notes) return d;
+      return { ...d, [id]: { ...e, notes: e.notes.map((n) => (n.id === noteId ? { ...n, deleted: true, updatedAt: Date.now() } : n)) } };
+    });
+  }, []);
+  const notes = useCallback(
+    (id: string) => activeNotes(dataRef.current[id]).sort((a, b) => b.at - a.at),
+    [],
+  );
+
   const exportJSON = useCallback(() => {
     const blob = new Blob([JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), data: dataRef.current }, null, 2)], {
       type: 'application/json',
@@ -97,9 +134,30 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
   const mergeRemote = useCallback((remote: UserDataMap) => {
     const local = dataRef.current;
     const merged: UserDataMap = { ...local };
-    for (const [id, r] of Object.entries(remote || {})) {
-      const l = merged[id];
-      if (!l || (r.updatedAt ?? 0) > (l.updatedAt ?? 0)) merged[id] = r;
+    // Notizen je ID zusammenführen (neuester updatedAt gewinnt) – nichts geht verloren.
+    const mergeNotes = (a: Note[] = [], b: Note[] = []): Note[] => {
+      const m = new Map<string, Note>();
+      for (const n of [...a, ...b]) {
+        const prev = m.get(n.id);
+        if (!prev || (n.updatedAt ?? 0) > (prev.updatedAt ?? 0)) m.set(n.id, n);
+      }
+      return [...m.values()];
+    };
+    for (const id of new Set([...Object.keys(local), ...Object.keys(remote || {})])) {
+      const l = local[id];
+      const r = (remote || {})[id];
+      if (!r) continue;
+      if (!l) {
+        merged[id] = r;
+        continue;
+      }
+      // Skalar-Felder: neuerer entry.updatedAt gewinnt. Notizen: Vereinigung je ID.
+      const base = (r.updatedAt ?? 0) > (l.updatedAt ?? 0) ? r : l;
+      const notes = mergeNotes(l.notes, r.notes);
+      const out: UserEntry = { ...base };
+      if (notes.length) out.notes = notes;
+      else delete out.notes;
+      merged[id] = out;
     }
     setData(merged);
     return merged;
@@ -112,6 +170,9 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
       setSeen,
       setRating,
       setWatchCount,
+      notes,
+      addNote,
+      deleteNote,
       count: Object.values(data).filter(hasData).length,
       exportJSON,
       importJSON,
@@ -119,7 +180,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
       snapshot,
       mergeRemote,
     }),
-    [data, setSeen, setRating, setWatchCount, exportJSON, importJSON, clearAll, snapshot, mergeRemote],
+    [data, setSeen, setRating, setWatchCount, notes, addNote, deleteNote, exportJSON, importJSON, clearAll, snapshot, mergeRemote],
   );
 
   return <C.Provider value={value}>{children}</C.Provider>;
