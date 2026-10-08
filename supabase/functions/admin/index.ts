@@ -135,13 +135,32 @@ Deno.serve(async (req) => {
           contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: body.mime || 'image/jpeg', data: body.image } }] }],
           generationConfig: { responseMimeType: 'application/json', temperature: 0 },
         };
-        const gr = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${gkey}`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(gbody),
-        });
-        const gd = await gr.json();
-        if (!gr.ok) return json({ error: `Gemini ${gr.status}: ${JSON.stringify(gd).slice(0, 300)}` }, 500);
+        // Gemini-503/429 sind meist kurze Lastspitzen → mit Backoff erneut versuchen,
+        // optional ein stabileres Fallback-Modell (Secret GEMINI_MODEL_FALLBACK).
+        const fallback = Deno.env.get('GEMINI_MODEL_FALLBACK') || '';
+        const models = fallback && fallback !== model ? [model, fallback] : [model];
+        let gd: any = null;
+        let lastErr = 'keine Antwort';
+        for (const m of models) {
+          let ok = false;
+          for (let attempt = 0; attempt < 3; attempt++) {
+            const gr = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${gkey}`, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify(gbody),
+            });
+            gd = await gr.json().catch(() => ({}));
+            if (gr.ok) {
+              ok = true;
+              break;
+            }
+            lastErr = `${m} ${gr.status}: ${JSON.stringify(gd).slice(0, 180)}`;
+            if (![429, 500, 502, 503].includes(gr.status)) break; // dauerhafter Fehler → nicht wiederholen
+            await new Promise((r) => setTimeout(r, 800 * 2 ** attempt)); // 0,8s · 1,6s · 3,2s
+          }
+          if (ok) break;
+        }
+        if (!gd?.candidates) return json({ error: `Gemini ${lastErr}` }, 503);
         const text = gd.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
         let fields: Record<string, unknown> = {};
         try {
