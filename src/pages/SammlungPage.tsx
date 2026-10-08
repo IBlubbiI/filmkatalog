@@ -17,7 +17,10 @@ interface Entry {
   poster: string | null; // TMDB-Pfad (für nicht besessene Titel)
   owned: Movie | null;
   status: Status; // owned = im Besitz · available = auf Disc erhältlich · upcoming = noch kein Disc-Release
+  animation: boolean; // Trickfilm/Animation (für die Trickfilm-/Spielfilm-Aufteilung)
 }
+
+const isAnimation = (m: Movie) => (m.genres || []).includes('Animation') || m.mainGenre === 'Animation';
 interface SubGroup {
   label: string; // '' = keine Unterüberschrift (normale Reihe)
   list: Entry[];
@@ -43,25 +46,29 @@ const isMainStory = (m: Movie, cat: string) =>
 
 // Flache Reihen (Regisseur-/Autoren-Reihen): keine Haupt-/Spin-off-Trennung.
 // Muss zu SERIES_FLAT in scripts/lib/series-extras.mjs passen.
-const FLAT_KEYS = new Set(['Christopher Nolan', 'Quentin Tarantino', 'Astrid Lindgren', 'Märchenfilme']);
+const FLAT_KEYS = new Set(['Christopher Nolan', 'Quentin Tarantino', 'Astrid Lindgren', 'Michael Ende', 'Bud Spencer & Terence Hill', 'Märchenfilme']);
+// Reihen, die statt Haupt-/Spin-off nach Trickfilm vs. Spielfilm getrennt werden.
+const SPLIT_BY_FORMAT = new Set(['Asterix', 'Drachenzähmen leicht gemacht']);
 
 /** Baut die Einträge einer Film-Menge: eigene Filme + Sammlungs-Teile (+ optional Ableger). */
 function entriesFromFilms(films: Movie[], data: ReturnType<typeof useData>, globalOwned: Map<number, Movie>, extraKeys: string[]): Entry[] {
-  const raw = new Map<string | number, { title: string; year: string | null; poster: string | null; future: boolean; owned: Movie | null }>();
-  const add = (id: string | number, title: string, year: string | null, poster: string | null, future: boolean) => {
-    if (!raw.has(id)) raw.set(id, { title, year, poster, future, owned: null });
+  const raw = new Map<string | number, { title: string; year: string | null; poster: string | null; future: boolean; owned: Movie | null; animation: boolean }>();
+  const add = (id: string | number, title: string, year: string | null, poster: string | null, future: boolean, animation: boolean) => {
+    if (!raw.has(id)) raw.set(id, { title, year, poster, future, owned: null, animation });
   };
   const collIds = new Set(films.map((f) => f.tmdb?.collection?.id).filter(Boolean) as number[]);
-  for (const cid of collIds) for (const p of data.collections[cid]?.parts ?? []) add(p.tmdbId, p.title, p.year, p.poster, !!p.future);
-  for (const key of extraKeys) for (const ex of data.collectionExtras[key] ?? []) add(ex.tmdbId, ex.title, ex.year, ex.poster, !!ex.future);
+  for (const cid of collIds) for (const p of data.collections[cid]?.parts ?? []) add(p.tmdbId, p.title, p.year, p.poster, !!p.future, !!p.animation);
+  for (const key of extraKeys) for (const ex of data.collectionExtras[key] ?? []) add(ex.tmdbId, ex.title, ex.year, ex.poster, !!ex.future, !!ex.animation);
   // Besitz GLOBAL markieren (ein Titel kann in einer anderen Reihe besessen sein, z. B. Hexenjäger)
   for (const [id, e] of raw) if (typeof id === 'number') e.owned = globalOwned.get(id) ?? null;
   // eigene Filme ergänzen – auch die OHNE TMDB-Treffer (z. B. Sammelboxen)
   for (const f of films) {
     const id = f.tmdb?.tmdbId ?? `film:${f.id}`;
     const ex = raw.get(id);
-    if (ex) ex.owned = f;
-    else raw.set(id, { title: f.title, year: f.year ? String(f.year) : f.yearRaw, poster: null, future: false, owned: f });
+    if (ex) {
+      ex.owned = f;
+      ex.animation = isAnimation(f); // eigene Genre-Daten sind zuverlässiger
+    } else raw.set(id, { title: f.title, year: f.year ? String(f.year) : f.yearRaw, poster: null, future: false, owned: f, animation: isAnimation(f) });
   }
   return [...raw.entries()]
     .map(([id, e]): Entry => ({
@@ -72,6 +79,7 @@ function entriesFromFilms(films: Movie[], data: ReturnType<typeof useData>, glob
       poster: e.poster,
       owned: e.owned,
       status: e.owned ? 'owned' : e.future ? 'upcoming' : 'available',
+      animation: e.animation,
     }))
     .sort((a, b) => (Number(a.year) || 9999) - (Number(b.year) || 9999));
 }
@@ -127,6 +135,21 @@ function buildSections(data: ReturnType<typeof useData>): Section[] {
     // Regisseur-/Autoren-Reihen: flach, keine Trennung.
     if (FLAT_KEYS.has(key)) {
       universes.push({ key, name, groups: [{ label: '', list }] });
+      continue;
+    }
+
+    // Aufteilung nach Trickfilm (Animation) vs. Spielfilm (z. B. Asterix, Drachenzähmen).
+    if (SPLIT_BY_FORMAT.has(key)) {
+      const trick = list.filter((e) => e.animation);
+      const real = list.filter((e) => !e.animation);
+      const groups =
+        trick.length && real.length
+          ? [
+              { label: 'Zeichentrick / Animation', list: trick },
+              { label: 'Spielfilm', list: real },
+            ]
+          : [{ label: '', list }];
+      universes.push({ key, name, groups });
       continue;
     }
 

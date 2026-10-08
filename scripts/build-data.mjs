@@ -28,6 +28,7 @@ import { universeOf } from './lib/universe-map.mjs';
 import { canonicalLabel } from './lib/label-map.mjs';
 import { buildSeriesData } from './lib/series.mjs';
 import { buildPeopleData } from './lib/people.mjs';
+import { TMDB_OVERRIDES } from './lib/tmdb-overrides.mjs';
 import { supabaseConfigured, fetchMoviesFromSupabase } from './lib/source-supabase.mjs';
 import { makeTmdbClient, downloadImage } from './lib/tmdb.mjs';
 
@@ -322,7 +323,8 @@ const readJson = (p, fallback) => {
 };
 
 const cache = readJson(CACHE_PATH, {});
-const overrides = readJson(OVERRIDES_PATH, {});
+// Committete Overrides (im Repo, auch in der CI) + optional lokale Datei (Vorrang).
+const overrides = { ...TMDB_OVERRIDES, ...readJson(OVERRIDES_PATH, {}) };
 const unmatched = [];
 const matches = []; // QA: was wurde worauf gematcht (für tmdb-matches.md)
 

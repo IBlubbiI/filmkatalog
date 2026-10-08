@@ -119,6 +119,7 @@ export async function buildSeriesData({ movies, client, root, refresh = false, l
         const future = isFuture(d.first_air_date) || !d.first_air_date;
         result = {
           future, real: tvIsReal(d), title: d.name || d.original_name, year: (d.first_air_date || '').slice(0, 4) || null, poster: d.poster_path || null,
+          animation: (d.genres || []).some((g) => g.id === 16),
           overview: d.overview || null, rating: rd2(d.vote_average), runtime: (d.episode_run_time || [])[0] || null, seasons: d.number_of_seasons || null, backdrop: d.backdrop_path || null, cast: castOf(d),
         };
       } else {
@@ -127,6 +128,7 @@ export async function buildSeriesData({ movies, client, root, refresh = false, l
         const future = isFuture(d.release_date) || (!!d.status && d.status !== 'Released');
         result = {
           future, real: movieIsReal(d), title: d.title || d.original_title, year: (d.release_date || '').slice(0, 4) || null, poster: d.poster_path || null,
+          animation: (d.genres || []).some((g) => g.id === 16),
           overview: d.overview || null, rating: rd2(d.vote_average), runtime: d.runtime || null, seasons: null, backdrop: d.backdrop_path || null, cast: castOf(d),
         };
       }
@@ -137,7 +139,7 @@ export async function buildSeriesData({ movies, client, root, refresh = false, l
       return null;
     }
   }
-  const detailFields = (m) => ({ overview: m.overview, rating: m.rating, runtime: m.runtime, seasons: m.seasons, backdrop: m.backdrop, cast: m.cast });
+  const detailFields = (m) => ({ overview: m.overview, rating: m.rating, runtime: m.runtime, seasons: m.seasons, backdrop: m.backdrop, cast: m.cast, animation: m.animation });
 
   // ---- 1. TMDB-Filmreihen (Collections) -------------------------------------
   const collCache = readJson(COLLECTIONS_CACHE, {});

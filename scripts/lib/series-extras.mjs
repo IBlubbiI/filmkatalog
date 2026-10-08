@@ -121,6 +121,8 @@ export const SERIES_FLAT = new Set([
   'Christopher Nolan', // Regisseur-Reihe
   'Quentin Tarantino', // Regisseur-Reihe
   'Astrid Lindgren', // Autoren-Reihe (Buchverfilmungen)
+  'Michael Ende', // Autoren-Reihe (u. a. Unendliche Geschichte, Momo, Jim Knopf)
+  'Bud Spencer & Terence Hill', // Duo-Reihe, alle gleichwertig
   'Märchenfilme', // Sammel-Reihe gleichwertiger Märchenverfilmungen
 ]);
 

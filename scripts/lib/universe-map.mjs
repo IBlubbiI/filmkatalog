@@ -40,7 +40,7 @@ export const UNIVERSE_MAP = {
 // Per-Film-Universum – für Einträge, deren "Reihe/Franchise" in der Excel leer
 // oder uneinheitlich ist (Datenlücken). ID gewinnt vor dem Franchise-Mapping.
 export const UNIVERSE_BY_ID = {
-  F318: 'Märchenfilme', // Drei Haselnüsse für Aschenbrödel (ohne Franchise)
+  // F318 (Die unendliche Geschichte) gehört zu „Michael Ende" (via Franchise), nicht Märchen.
   // Django & Hateful 8 gehören zur Quentin-Tarantino-Reihe (Franchise leer):
   F017: 'Quentin Tarantino',
   F018: 'Quentin Tarantino',

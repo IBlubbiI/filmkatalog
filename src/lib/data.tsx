@@ -32,6 +32,7 @@ export interface CollectionPart {
   type?: 'movie' | 'tv';
   future?: boolean; // Erstveröffentlichung liegt noch in der Zukunft (sonst: schon erschienen)
   main?: boolean; // gehört zur Hauptreihe (nicht Spin-off), obwohl als Extra geführt
+  animation?: boolean; // Trickfilm/Animation (für die Trickfilm-/Spielfilm-Aufteilung)
   // Detailinfos (nur für nicht besessene Titel gefüllt) – für die Entdecken-Seite
   overview?: string | null;
   rating?: number | null;
