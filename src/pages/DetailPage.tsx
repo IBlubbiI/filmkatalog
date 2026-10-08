@@ -141,15 +141,15 @@ function CastModal({ actor, currentGid, onClose }: { actor: CastMember; currentG
 
 // Bewertungs-Skala mit Kriterien – hilft, Filme zu differenzieren statt alles 8+ zu geben.
 const RATING_LEGEND: { n: number; label: string; hint: string }[] = [
-  { n: 10, label: 'Meisterwerk', hint: 'Prägend, (nahezu) perfekt – jederzeit wieder' },
-  { n: 9, label: 'Herausragend', hint: 'Großer Eindruck, nur Kleinigkeiten' },
-  { n: 8, label: 'Sehr gut', hint: 'Klare Empfehlung, bleibt im Kopf' },
-  { n: 7, label: 'Gut', hint: 'Gelungen & unterhaltsam, solide' },
-  { n: 6, label: 'Ordentlich', hint: 'Hat gefallen, aber vergessbar' },
-  { n: 5, label: 'Mittelmaß', hint: 'Okay – Zeitvertreib, weder noch' },
-  { n: 4, label: 'Schwächer', hint: 'Mehr Schwächen als Stärken' },
-  { n: 3, label: 'Schwach', hint: 'Kaum Positives, enttäuschend' },
-  { n: 2, label: 'Sehr schwach', hint: 'Fast durchgehend misslungen' },
+  { n: 10, label: 'Perfekt', hint: 'Der makellose Film – praktisch unerreichbar' },
+  { n: 9, label: 'Meisterwerk', hint: 'Prägend, (nahezu) perfekt – jederzeit wieder' },
+  { n: 8, label: 'Herausragend', hint: 'Großer Eindruck, nur Kleinigkeiten' },
+  { n: 7, label: 'Sehr gut', hint: 'Klare Empfehlung, bleibt im Kopf' },
+  { n: 6, label: 'Gut', hint: 'Gelungen & unterhaltsam, solide' },
+  { n: 5, label: 'Ordentlich', hint: 'Hat gefallen, aber vergessbar' },
+  { n: 4, label: 'Mittelmaß', hint: 'Okay – Zeitvertreib, weder noch' },
+  { n: 3, label: 'Schwächer', hint: 'Mehr Schwächen als Stärken' },
+  { n: 2, label: 'Schwach', hint: 'Kaum Positives, enttäuschend' },
   { n: 1, label: 'Grottig', hint: 'Verschwendete Zeit' },
 ];
 
@@ -202,7 +202,7 @@ function MyRatingPanel({ movie }: { movie: Movie }) {
         {showLegend && (
           <div className="mt-1.5 rounded-lg bg-ink-850 p-3 ring-1 ring-white/5">
             <p className="mb-2 text-[11px] leading-relaxed text-zinc-400">
-              Tipp: <span className="text-zinc-300">7 ist schon „gut"</span> – heb dir 9–10 für die wenigen Filme auf, die dich wirklich umgehauen haben, dann bleibt Spielraum nach oben.
+              Tipp: <span className="text-zinc-300">6 ist schon „gut"</span>. Die 10 ist dem perfekten Film vorbehalten (den es praktisch nicht gibt) – heb dir die 9 für echte Meisterwerke auf, dann bleibt Spielraum nach oben.
               Frag dich: Würde ich ihn <em>wieder</em> sehen? Weiterempfehlen? In einem Jahr noch erinnern?
             </p>
             <ul className="space-y-0.5">
