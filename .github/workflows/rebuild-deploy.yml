@@ -56,17 +56,9 @@ jobs:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
         run: npm run build:data
 
-      - name: Daten committen (Repo synchron halten)
-        run: |
-          if git diff --quiet -- public/; then
-            echo "Keine Datenänderung."
-          else
-            git config user.name  "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add public/
-            git commit -m "chore: Sammlung aus Supabase aktualisiert"
-            git push || echo "::warning::Push fehlgeschlagen (Deploy läuft trotzdem; ggf. Workflow permissions auf Read and write stellen)"
-          fi
+      # Hinweis: public/ wird bewusst NICHT ins Repo zurückcommittet. Der Deploy
+      # nutzt die hier frisch generierten Dateien direkt (nächster Schritt → dist).
+      # So entstehen keine CI-Commits mehr, die mit lokalen Commits kollidieren.
 
       - name: App bauen
         env:
