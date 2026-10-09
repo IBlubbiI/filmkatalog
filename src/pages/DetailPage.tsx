@@ -291,7 +291,7 @@ function NotesPanel({ movie }: { movie: Movie }) {
   };
 
   return (
-    <section className="mt-5 rounded-2xl border border-accent/25 bg-accent/[0.04] p-4">
+    <section className="mt-5 rounded-2xl border border-accent/25 bg-ink-800/60 p-4">
       <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-accent/80">Notizen</h3>
 
       {/* Verfassen */}
