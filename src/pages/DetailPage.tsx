@@ -290,11 +290,9 @@ function NotesPanel({ movie }: { movie: Movie }) {
     setEditingId(null);
   };
 
-  const paperText = 'font-hand text-[1.4rem] leading-[1.7rem] text-[#39311f] placeholder:text-[#39311f]/40';
-
   return (
-    <section className="mt-5 rounded-xl bg-ink-800/60 p-4 ring-1 ring-white/5">
-      <h3 className="mb-3 text-sm font-semibold text-zinc-200">Notizen</h3>
+    <section className="mt-5 rounded-2xl border border-accent/25 bg-accent/[0.04] p-4">
+      <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-accent/80">Notizen</h3>
 
       {/* Verfassen */}
       <div className="flex flex-col gap-2">
@@ -341,7 +339,7 @@ function NotesPanel({ movie }: { movie: Movie }) {
           onChange={(e) => setText(e.target.value)}
           rows={3}
           placeholder="Deine Gedanken zum Film…"
-          className={`note-paper w-full resize-y rounded-md pb-2 pl-[2.9rem] pr-3 pt-[0.35rem] shadow-md shadow-black/30 outline-none ${paperText}`}
+          className="w-full resize-y rounded-lg border border-ink-700 bg-ink-800 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-accent/60"
         />
         <div className="flex justify-end">
           <button
@@ -356,24 +354,20 @@ function NotesPanel({ movie }: { movie: Movie }) {
 
       {/* Bestehende Notizen als Notizzettel */}
       {list.length > 0 && (
-        <ul className="mt-4 space-y-3">
-          {list.map((n, i) => (
-            <li
-              key={n.id}
-              className="note-paper overflow-hidden rounded-md shadow-lg shadow-black/30"
-              style={{ transform: `rotate(${i % 2 ? 0.35 : -0.35}deg)` }}
-            >
+        <ul className="mt-4 space-y-2.5">
+          {list.map((n) => (
+            <li key={n.id} className="overflow-hidden rounded-lg border-l-2 border-accent/60 bg-ink-850 ring-1 ring-white/5">
               {editingId === n.id ? (
-                <div className="p-2">
+                <div className="p-3">
                   <textarea
                     autoFocus
                     value={editText}
                     onChange={(e) => setEditText(e.target.value)}
                     rows={paperRows(editText)}
-                    className={`w-full resize-y rounded bg-transparent pl-[2.3rem] pr-1 pt-[0.2rem] outline-none ${paperText}`}
+                    className="w-full resize-y rounded-lg border border-ink-700 bg-ink-800 px-3 py-2 text-sm text-zinc-100 focus:border-accent/60"
                   />
-                  <div className="flex justify-end gap-2 pb-1 pr-1">
-                    <button onClick={() => setEditingId(null)} className="rounded px-3 py-1 text-xs font-medium text-[#39311f]/70 hover:bg-black/5">
+                  <div className="mt-2 flex justify-end gap-2">
+                    <button onClick={() => setEditingId(null)} className="rounded px-3 py-1 text-xs font-medium text-zinc-400 hover:bg-ink-700">
                       Abbrechen
                     </button>
                     <button onClick={saveEdit} disabled={!editText.trim()} className="rounded bg-accent px-3 py-1 text-xs font-bold text-ink-950 hover:bg-accent-soft disabled:opacity-40">
@@ -383,18 +377,18 @@ function NotesPanel({ movie }: { movie: Movie }) {
                 </div>
               ) : (
                 <>
-                  <div className="flex items-baseline justify-between pl-[2.9rem] pr-3 pt-1 font-hand text-[#39311f]">
-                    <span className="text-[1.15rem] font-bold leading-[1.7rem]">{n.author}</span>
-                    <span className="text-[0.85rem] opacity-60">{noteDate(n.at)}</span>
+                  <div className="flex items-baseline justify-between px-3 pt-2.5">
+                    <span className="text-sm font-semibold text-accent-soft/90">{n.author}</span>
+                    <span className="text-xs text-zinc-500">{noteDate(n.at)}</span>
                   </div>
-                  <p className={`whitespace-pre-wrap pb-1 pl-[2.9rem] pr-3 ${paperText}`}>{n.text}</p>
-                  <div className="flex justify-end gap-3 pb-1.5 pr-3 text-[11px] text-[#39311f]/60">
+                  <p className="whitespace-pre-wrap px-3 pt-1 text-sm leading-relaxed text-zinc-200">{n.text}</p>
+                  <div className="flex justify-end gap-3 px-3 pb-2 pt-1.5 text-[11px] text-zinc-500">
                     <button
                       onClick={() => {
                         setEditingId(n.id);
                         setEditText(n.text);
                       }}
-                      className="hover:text-[#39311f]"
+                      className="hover:text-zinc-300"
                     >
                       Bearbeiten
                     </button>
@@ -402,7 +396,7 @@ function NotesPanel({ movie }: { movie: Movie }) {
                       onClick={() => {
                         if (confirm('Notiz löschen?')) deleteNote(rid, n.id);
                       }}
-                      className="hover:text-red-700"
+                      className="hover:text-red-300"
                     >
                       Löschen
                     </button>
