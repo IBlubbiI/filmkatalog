@@ -115,6 +115,76 @@ async function scaledBase64(file: File, maxDim = 1600): Promise<{ data: string; 
   }
 }
 
+// Eigenes Dropdown (statt <datalist>): klappt nach unten auf, vertikal scrollbar.
+// Die Tastatur öffnet erst beim Tippen ins Textfeld, nicht beim Pfeil-Tippen.
+function Combobox({ value, onChange, options, placeholder }: { value: string; onChange: (v: string) => void; options: string[]; placeholder?: string }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: Event) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', onDoc);
+    return () => document.removeEventListener('pointerdown', onDoc);
+  }, [open]);
+
+  const q = value.trim().toLowerCase();
+  const exact = options.some((o) => o.toLowerCase() === q);
+  const filtered = !q || exact ? options : options.filter((o) => o.toLowerCase().includes(q));
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <div className="flex items-stretch rounded-lg border border-ink-700 bg-ink-800 focus-within:border-accent/60">
+        <input
+          ref={inputRef}
+          type="text"
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          placeholder={placeholder}
+          className="w-full min-w-0 bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-zinc-600"
+        />
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label="Vorschläge anzeigen"
+          onClick={() => setOpen((o) => !o)}
+          className="flex w-9 shrink-0 items-center justify-center text-zinc-400 hover:text-zinc-200"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${open ? 'rotate-180' : ''}`}>
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+      </div>
+      {open && filtered.length > 0 && (
+        <ul className="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-y-auto overscroll-contain rounded-lg border border-ink-700 bg-ink-800 py-1 shadow-xl shadow-black/50">
+          {filtered.map((o) => (
+            <li key={o}>
+              <button
+                type="button"
+                onClick={() => {
+                  onChange(o);
+                  setOpen(false);
+                  inputRef.current?.blur();
+                }}
+                className={`block w-full px-3 py-2 text-left text-sm hover:bg-ink-700 ${o === value ? 'text-accent-soft' : 'text-zinc-200'}`}
+              >
+                {o}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function VerwaltenPage() {
   const data = useData();
   const [pw, setPw] = useState<string>(() => sessionStorage.getItem(PW_KEY) || '');
@@ -555,32 +625,24 @@ export function VerwaltenPage() {
               <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{g.group}</h3>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {g.items.map((f) => (
-                  <label key={f.k} className="block">
+                  <div key={f.k} className="block">
                     <span className="mb-0.5 block text-[11px] text-zinc-500">{f.l}</span>
                     {f.t === 'select' ? (
                       <select value={String(form[f.k] ?? '')} onChange={(e) => set(f.k, e.target.value)} className="w-full rounded-lg border border-ink-700 bg-ink-800 px-2 py-1.5 text-sm focus:border-accent/60">
                         {f.o!.map((o) => <option key={o} value={o}>{o || '—'}</option>)}
                       </select>
+                    ) : f.t === 'text' && suggestions[f.k]?.length ? (
+                      <Combobox value={String(form[f.k] ?? '')} onChange={(v) => set(f.k, v)} options={suggestions[f.k]} placeholder={f.ph} />
                     ) : (
-                      <>
-                        <input
-                          type={f.t === 'number' ? 'number' : 'text'}
-                          value={String(form[f.k] ?? '')}
-                          onChange={(e) => set(f.k, e.target.value)}
-                          placeholder={f.ph}
-                          list={f.t === 'text' && suggestions[f.k]?.length ? `dl-${f.k}` : undefined}
-                          className="w-full rounded-lg border border-ink-700 bg-ink-800 px-2 py-1.5 text-sm placeholder:text-zinc-600 focus:border-accent/60"
-                        />
-                        {f.t === 'text' && suggestions[f.k]?.length ? (
-                          <datalist id={`dl-${f.k}`}>
-                            {suggestions[f.k].map((v) => (
-                              <option key={v} value={v} />
-                            ))}
-                          </datalist>
-                        ) : null}
-                      </>
+                      <input
+                        type={f.t === 'number' ? 'number' : 'text'}
+                        value={String(form[f.k] ?? '')}
+                        onChange={(e) => set(f.k, e.target.value)}
+                        placeholder={f.ph}
+                        className="w-full rounded-lg border border-ink-700 bg-ink-800 px-2 py-1.5 text-sm placeholder:text-zinc-600 focus:border-accent/60"
+                      />
                     )}
-                  </label>
+                  </div>
                 ))}
               </div>
             </div>
