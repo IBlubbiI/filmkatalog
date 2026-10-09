@@ -113,7 +113,7 @@ function buildSections(data: ReturnType<typeof useData>): Section[] {
       }
     } else {
       const spinList = entriesFromFilms(spinFilms, data, globalOwned, []);
-      if (spinList.length) groups.push({ label: 'Spin-offs & weitere Filme', list: spinList });
+      if (spinList.length) groups.push({ label: 'Spin-offs, Serien & weitere Filme', list: spinList });
     }
     if (groups.length) universes.push({ key: `cat:${cat}`, name: `${cat}-Universum`, groups });
   }
@@ -182,7 +182,7 @@ function buildSections(data: ReturnType<typeof useData>): Section[] {
       main.length && spin.length
         ? [
             { label: 'Hauptreihe', list: main },
-            { label: 'Spin-offs & weitere Filme', list: spin },
+            { label: 'Spin-offs, Serien & weitere Filme', list: spin },
           ]
         : [{ label: '', list }];
     universes.push({ key, name, groups });
