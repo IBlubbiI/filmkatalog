@@ -251,9 +251,13 @@ function MyRatingPanel({ movie }: { movie: Movie }) {
 const NOTE_AUTHORS = ['Thomas', 'Hannah', 'Ursula'];
 const NOTE_AUTHOR_KEY = 'filmkatalog.note.author';
 
+const noteDate = (ms: number) => new Date(ms).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' });
+// Zeilenzahl grob aus dem Text schätzen (für die Höhe der Papier-Textfelder).
+const paperRows = (t: string) => Math.max(3, t.split('\n').length, Math.ceil(t.length / 42));
+
 function NotesPanel({ movie }: { movie: Movie }) {
   const data = useData();
-  const { notes, addNote, deleteNote } = useUserData();
+  const { notes, addNote, editNote, deleteNote } = useUserData();
   // Notizen gelten film-weit → immer am Gruppen-Primär speichern (wie die Bewertung).
   const rid = (movie.groupId && data.groups.get(movie.groupId)?.[0]?.id) || movie.id;
   const list = notes(rid);
@@ -266,6 +270,8 @@ function NotesPanel({ movie }: { movie: Movie }) {
   });
   const [text, setText] = useState('');
   const [addingAuthor, setAddingAuthor] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
   const authorOptions = [...new Set([...NOTE_AUTHORS, ...list.map((n) => n.author)])];
 
   const submit = () => {
@@ -279,11 +285,18 @@ function NotesPanel({ movie }: { movie: Movie }) {
       /* ignore */
     }
   };
+  const saveEdit = () => {
+    if (editingId && editText.trim()) editNote(rid, editingId, editText);
+    setEditingId(null);
+  };
+
+  const paperText = 'font-hand text-[1.4rem] leading-[1.7rem] text-[#39311f] placeholder:text-[#39311f]/40';
 
   return (
     <section className="mt-5 rounded-xl bg-ink-800/60 p-4 ring-1 ring-white/5">
-      <h3 className="mb-2 text-sm font-semibold text-zinc-200">Notizen</h3>
+      <h3 className="mb-3 text-sm font-semibold text-zinc-200">Notizen</h3>
 
+      {/* Verfassen */}
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="mr-0.5 text-xs text-zinc-500">Autor:</span>
@@ -328,7 +341,7 @@ function NotesPanel({ movie }: { movie: Movie }) {
           onChange={(e) => setText(e.target.value)}
           rows={3}
           placeholder="Deine Gedanken zum Film…"
-          className="w-full resize-y rounded-lg border border-ink-700 bg-ink-800 px-3 py-2 text-sm placeholder:text-zinc-600 focus:border-accent/60"
+          className={`note-paper w-full resize-y rounded-md pb-2 pl-[2.9rem] pr-3 pt-[0.35rem] shadow-md shadow-black/30 outline-none ${paperText}`}
         />
         <div className="flex justify-end">
           <button
@@ -341,25 +354,61 @@ function NotesPanel({ movie }: { movie: Movie }) {
         </div>
       </div>
 
+      {/* Bestehende Notizen als Notizzettel */}
       {list.length > 0 && (
-        <ul className="mt-4 space-y-2">
-          {list.map((n) => (
-            <li key={n.id} className="rounded-lg bg-ink-850 p-3 ring-1 ring-white/5">
-              <div className="mb-1 flex items-center justify-between text-xs">
-                <span className="font-semibold text-accent-soft/90">{n.author}</span>
-                <span className="text-zinc-500">{new Date(n.at).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-              </div>
-              <p className="whitespace-pre-wrap text-sm text-zinc-200">{n.text}</p>
-              <div className="mt-1 text-right">
-                <button
-                  onClick={() => {
-                    if (confirm('Notiz löschen?')) deleteNote(rid, n.id);
-                  }}
-                  className="text-[11px] text-zinc-500 hover:text-red-300"
-                >
-                  Löschen
-                </button>
-              </div>
+        <ul className="mt-4 space-y-3">
+          {list.map((n, i) => (
+            <li
+              key={n.id}
+              className="note-paper overflow-hidden rounded-md shadow-lg shadow-black/30"
+              style={{ transform: `rotate(${i % 2 ? 0.35 : -0.35}deg)` }}
+            >
+              {editingId === n.id ? (
+                <div className="p-2">
+                  <textarea
+                    autoFocus
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    rows={paperRows(editText)}
+                    className={`w-full resize-y rounded bg-transparent pl-[2.3rem] pr-1 pt-[0.2rem] outline-none ${paperText}`}
+                  />
+                  <div className="flex justify-end gap-2 pb-1 pr-1">
+                    <button onClick={() => setEditingId(null)} className="rounded px-3 py-1 text-xs font-medium text-[#39311f]/70 hover:bg-black/5">
+                      Abbrechen
+                    </button>
+                    <button onClick={saveEdit} disabled={!editText.trim()} className="rounded bg-accent px-3 py-1 text-xs font-bold text-ink-950 hover:bg-accent-soft disabled:opacity-40">
+                      Speichern
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-baseline justify-between pl-[2.9rem] pr-3 pt-1 font-hand text-[#39311f]">
+                    <span className="text-[1.15rem] font-bold leading-[1.7rem]">{n.author}</span>
+                    <span className="text-[0.85rem] opacity-60">{noteDate(n.at)}</span>
+                  </div>
+                  <p className={`whitespace-pre-wrap pb-1 pl-[2.9rem] pr-3 ${paperText}`}>{n.text}</p>
+                  <div className="flex justify-end gap-3 pb-1.5 pr-3 text-[11px] text-[#39311f]/60">
+                    <button
+                      onClick={() => {
+                        setEditingId(n.id);
+                        setEditText(n.text);
+                      }}
+                      className="hover:text-[#39311f]"
+                    >
+                      Bearbeiten
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirm('Notiz löschen?')) deleteNote(rid, n.id);
+                      }}
+                      className="hover:text-red-700"
+                    >
+                      Löschen
+                    </button>
+                  </div>
+                </>
+              )}
             </li>
           ))}
         </ul>
@@ -550,9 +599,6 @@ export function DetailPage() {
         {/* Meine Bewertung / Gesehen (in der App gepflegt) */}
         <MyRatingPanel movie={movie} />
 
-        {/* Notizen / Gedanken zum Film (mit Autor, geräteübergreifend synchronisiert) */}
-        <NotesPanel movie={movie} />
-
         {/* Genres */}
         {(movie.genres.length > 0 || movie.franchise) && (
           <div className="mt-4 flex flex-wrap gap-1.5">
@@ -577,6 +623,9 @@ export function DetailPage() {
 
         {/* Besetzung */}
         <CastRow cast={movie.tmdb?.cast ?? []} onSelect={setCastSel} />
+
+        {/* Notizen / Gedanken zum Film (mit Autor, geräteübergreifend synchronisiert) */}
+        <NotesPanel movie={movie} />
 
         {/* Technik */}
         <Block title="Bild & Ton">

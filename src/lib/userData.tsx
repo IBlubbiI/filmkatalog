@@ -35,6 +35,7 @@ interface Ctx {
   setWatchCount: (id: string, n: number) => void;
   notes: (id: string) => Note[]; // aktive Notizen, neueste zuerst
   addNote: (id: string, author: string, text: string) => void;
+  editNote: (id: string, noteId: string, text: string, author?: string) => void;
   deleteNote: (id: string, noteId: string) => void;
   count: number; // Anzahl Filme mit Daten
   exportJSON: () => void;
@@ -91,6 +92,18 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
     if (!t) return;
     const note: Note = { id: uuid(), author: author.trim() || 'Ich', text: t, at: Date.now(), updatedAt: Date.now() };
     setData((d) => ({ ...d, [id]: { ...d[id], notes: [...(d[id]?.notes ?? []), note] } }));
+  }, []);
+  const editNote = useCallback((id: string, noteId: string, text: string, author?: string) => {
+    const t = text.trim();
+    if (!t) return;
+    setData((d) => {
+      const e = d[id];
+      if (!e?.notes) return d;
+      return {
+        ...d,
+        [id]: { ...e, notes: e.notes.map((n) => (n.id === noteId ? { ...n, text: t, author: author?.trim() || n.author, updatedAt: Date.now() } : n)) },
+      };
+    });
   }, []);
   const deleteNote = useCallback((id: string, noteId: string) => {
     setData((d) => {
@@ -172,6 +185,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
       setWatchCount,
       notes,
       addNote,
+      editNote,
       deleteNote,
       count: Object.values(data).filter(hasData).length,
       exportJSON,
@@ -180,7 +194,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
       snapshot,
       mergeRemote,
     }),
-    [data, setSeen, setRating, setWatchCount, notes, addNote, deleteNote, exportJSON, importJSON, clearAll, snapshot, mergeRemote],
+    [data, setSeen, setRating, setWatchCount, notes, addNote, editNote, deleteNote, exportJSON, importJSON, clearAll, snapshot, mergeRemote],
   );
 
   return <C.Provider value={value}>{children}</C.Provider>;

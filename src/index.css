@@ -53,6 +53,24 @@ html[data-theme='light'] body {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  /* Handschrift-Font für den Notizblock */
+  .font-hand {
+    font-family: 'Caveat', ui-rounded, 'Segoe Print', 'Comic Sans MS', cursive;
+  }
+  /* Notizblock-Papier: cremefarben, liniert, mit rotem Rand links */
+  .note-paper {
+    --rule: 1.7rem;
+    background-color: #fbf4db;
+    color: #39311f;
+    background-image:
+      linear-gradient(to right, transparent 2.3rem, rgba(201, 74, 61, 0.5) 2.3rem, rgba(201, 74, 61, 0.5) calc(2.3rem + 1.5px), transparent calc(2.3rem + 1.5px)),
+      repeating-linear-gradient(to bottom, #fbf4db 0, #fbf4db calc(var(--rule) - 1px), rgba(57, 49, 31, 0.16) var(--rule));
+    background-attachment: local;
+  }
+  .note-paper::placeholder {
+    color: rgba(57, 49, 31, 0.4);
+  }
 }
 
 /* sanftes Fokus-Styling für Touch/Tastatur */
