@@ -46,8 +46,8 @@ jobs:
             data/tmdb-collections-cache.json
             data/tmdb-detail-cache.json
             data/tmdb-people-cache.json
-          key: tmdb-cache-v2-${{ github.run_id }}
-          restore-keys: tmdb-cache-v2-
+          key: tmdb-cache-v3-${{ github.run_id }}
+          restore-keys: tmdb-cache-v3-
 
       - name: Daten aus Supabase bauen
         env:

@@ -476,6 +476,10 @@ async function enrichFromTmdb(client, movie, tmdbId, isTv, score, source, poster
     overview: overview || null,
     poster,
     backdrop,
+    // Roh-TMDB-Pfade mitcachen, damit die Bilddateien später (z. B. in der CI, die
+    // public/ nicht mehr aufhebt) aus dem Cache heraus nachgeladen werden können.
+    tmdbPoster: posterOverride || det.poster_path || null,
+    tmdbBackdrop: det.backdrop_path || null,
     cast,
     collection,
     matchedTitle,
@@ -524,6 +528,14 @@ if (NO_TMDB || !TMDB_KEY) {
     })();
     // Cache nutzen, außer --refresh, Override, bisher erfolglos oder Titel passt nicht mehr
     if (!REFRESH && !override && cached && cached.matched && cacheFits) {
+      // Bilddateien sicherstellen (lädt nur, wenn lokal nicht vorhanden) – wichtig in
+      // der CI, die public/ nicht zurückcommittet; so fehlen Poster neuer Filme nie.
+      try {
+        if (cached.tmdbPoster) await maybeDownload(cached.tmdbPoster, `${m.id}.jpg`, 'w500');
+        if (cached.tmdbBackdrop) await maybeDownload(cached.tmdbBackdrop, `${m.id}_bg.jpg`, 'w780');
+      } catch (e) {
+        warn(`${m.id} Bild nachladen: ${e.message}`);
+      }
       m.tmdb = {
         tmdbId: cached.tmdbId, rating: cached.rating, votes: cached.votes,
         overview: cached.overview, poster: cached.poster, backdrop: cached.backdrop,
