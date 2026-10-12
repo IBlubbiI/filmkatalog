@@ -37,7 +37,13 @@ export const admin = {
   search: (query: string, pw: string): Promise<TmdbHit[]> => call('search', { query }, pw).then((d) => d.results),
   detail: (tmdbId: number, type: string, pw: string): Promise<TmdbDetail> => call('detail', { tmdbId, type }, pw),
   nextId: (pw: string): Promise<string> => call('next_id', {}, pw).then((d) => d.id),
-  upsert: (movie: MovieRow, pw: string): Promise<MovieRow> => call('upsert', { movie }, pw).then((d) => d.movie),
+  upsert: (movie: MovieRow, pw: string): Promise<MovieRow> => {
+    // Leere Strings → null, sonst scheitern Zahlen-Spalten (Jahr/FSK/Discs/Bewertung …)
+    // mit Postgres-Fehler 22P02 "invalid input syntax for type integer".
+    const clean: MovieRow = {};
+    for (const [k, v] of Object.entries(movie)) clean[k] = typeof v === 'string' && v.trim() === '' ? null : v;
+    return call('upsert', { movie: clean }, pw).then((d) => d.movie);
+  },
   remove: (id: string, pw: string): Promise<void> => call('remove', { id }, pw).then(() => undefined),
   publish: (pw: string): Promise<void> => call('publish', {}, pw).then(() => undefined),
   scan: (image: string, mime: string, pw: string): Promise<MovieRow> => call('scan', { image, mime }, pw).then((d) => d.fields || {}),
