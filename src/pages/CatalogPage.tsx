@@ -39,7 +39,7 @@ export function CatalogPage() {
       data.movies.map((m) => {
         const u = userData[m.id];
         if (!u) return m;
-        return { ...m, seen: u.seen ?? m.seen, rating: u.rating ?? m.rating, watchCount: u.watchCount ?? (u.seen ?? m.seen ? 1 : 0) };
+        return { ...m, seen: u.seen ?? m.seen, rating: u.rating ?? m.rating, watchCount: u.watchCount ?? (u.seen ?? m.seen ? 1 : 0), ratings: u.ratings };
       }),
     [data.movies, userData],
   );

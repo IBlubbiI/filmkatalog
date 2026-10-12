@@ -12,10 +12,17 @@ export interface Note {
   order?: number; // manuelle Reihenfolge (ms-Skala wie `at`); fehlt → nach `at` (neueste zuerst)
 }
 
+// Bewertung eines einzelnen Autors (eigener Zeitstempel für den Geräte-Merge).
+export interface AuthorRating {
+  value: number | null; // 1.0–10.0, null = gelöscht (Tombstone)
+  at: number;
+}
+
 // Vom Nutzer in der App gepflegte Daten (auf dem Gerät gespeichert).
 export interface UserEntry {
   seen?: boolean;
-  rating?: number | null; // 1.0–10.0, eine Nachkommastelle
+  rating?: number | null; // Gesamt-/Durchschnittswertung (für Katalog-Filter & -Sortierung)
+  ratings?: Record<string, AuthorRating>; // Bewertung je Autor (Thomas/Hannah/…)
   watchCount?: number; // wie oft gesehen (>=1)
   notes?: Note[]; // Gedanken/Kommentare zum Film (mit Autor)
   updatedAt?: number; // Zeitstempel (ms) für Merge der Skalar-Felder zwischen Geräten
@@ -23,7 +30,15 @@ export interface UserEntry {
 export type UserDataMap = Record<string, UserEntry>;
 
 const activeNotes = (e?: UserEntry) => (e?.notes ?? []).filter((n) => !n.deleted);
-const hasData = (e: UserEntry) => !!e && (e.seen || e.rating != null || !!e.watchCount || activeNotes(e).length > 0);
+// Durchschnitt der Autoren-Bewertungen (für die Gesamt-/Katalog-Wertung).
+const avgRating = (ratings?: Record<string, AuthorRating>): number | null => {
+  const vals = Object.values(ratings ?? {})
+    .map((r) => r.value)
+    .filter((v): v is number => v != null);
+  return vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null;
+};
+const hasAuthorRating = (e?: UserEntry) => Object.values(e?.ratings ?? {}).some((r) => r.value != null);
+const hasData = (e: UserEntry) => !!e && (e.seen || e.rating != null || !!e.watchCount || activeNotes(e).length > 0 || hasAuthorRating(e));
 const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
 const KEY = 'filmkatalog.userdata.v1';
@@ -33,6 +48,9 @@ interface Ctx {
   entry: (id: string) => UserEntry;
   setSeen: (id: string, seen: boolean) => void;
   setRating: (id: string, rating: number | null) => void;
+  authorRatings: (id: string) => Record<string, AuthorRating>; // Bewertungen je Autor
+  setAuthorRating: (id: string, author: string, value: number) => void;
+  clearAuthorRating: (id: string, author: string) => void;
   setWatchCount: (id: string, n: number) => void;
   notes: (id: string) => Note[]; // aktive Notizen in Anzeige-Reihenfolge
   addNote: (id: string, author: string, text: string) => void;
@@ -82,6 +100,24 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
     [patch],
   );
   const setRating = useCallback((id: string, rating: number | null) => patch(id, { rating }), [patch]);
+
+  // Bewertung je Autor (eigener Zeitstempel; Gesamtwertung = Durchschnitt).
+  const authorRatings = useCallback((id: string) => dataRef.current[id]?.ratings ?? {}, []);
+  const setAuthorRating = useCallback((id: string, author: string, value: number) => {
+    setData((d) => {
+      const e = d[id] ?? {};
+      const ratings = { ...(e.ratings ?? {}), [author]: { value, at: Date.now() } };
+      return { ...d, [id]: { ...e, ratings, rating: avgRating(ratings), updatedAt: Date.now() } };
+    });
+  }, []);
+  const clearAuthorRating = useCallback((id: string, author: string) => {
+    setData((d) => {
+      const e = d[id];
+      if (!e?.ratings) return d;
+      const ratings = { ...e.ratings, [author]: { value: null, at: Date.now() } }; // Tombstone
+      return { ...d, [id]: { ...e, ratings, rating: avgRating(ratings), updatedAt: Date.now() } };
+    });
+  }, []);
   const setWatchCount = useCallback(
     (id: string, n: number) => patch(id, { watchCount: Math.max(0, n), seen: n > 0 ? true : dataRef.current[id]?.seen }),
     [patch],
@@ -170,6 +206,14 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
       }
       return [...m.values()];
     };
+    // Bewertungen je Autor zusammenführen (neuester at gewinnt).
+    const mergeRatings = (a: Record<string, AuthorRating> = {}, b: Record<string, AuthorRating> = {}): Record<string, AuthorRating> => {
+      const m: Record<string, AuthorRating> = { ...a };
+      for (const [author, r] of Object.entries(b)) {
+        if (!m[author] || (r.at ?? 0) > (m[author].at ?? 0)) m[author] = r;
+      }
+      return m;
+    };
     for (const id of new Set([...Object.keys(local), ...Object.keys(remote || {})])) {
       const l = local[id];
       const r = (remote || {})[id];
@@ -178,12 +222,17 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
         merged[id] = r;
         continue;
       }
-      // Skalar-Felder: neuerer entry.updatedAt gewinnt. Notizen: Vereinigung je ID.
+      // Skalar-Felder: neuerer entry.updatedAt gewinnt. Notizen & Bewertungen: Vereinigung je ID/Autor.
       const base = (r.updatedAt ?? 0) > (l.updatedAt ?? 0) ? r : l;
       const notes = mergeNotes(l.notes, r.notes);
+      const ratings = mergeRatings(l.ratings, r.ratings);
       const out: UserEntry = { ...base };
       if (notes.length) out.notes = notes;
       else delete out.notes;
+      if (Object.keys(ratings).length) {
+        out.ratings = ratings;
+        out.rating = avgRating(ratings); // Gesamtwertung aus den zusammengeführten Autoren-Bewertungen
+      }
       merged[id] = out;
     }
     setData(merged);
@@ -196,6 +245,9 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
       entry: (id) => data[id] ?? {},
       setSeen,
       setRating,
+      authorRatings,
+      setAuthorRating,
+      clearAuthorRating,
       setWatchCount,
       notes,
       addNote,
@@ -209,7 +261,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
       snapshot,
       mergeRemote,
     }),
-    [data, setSeen, setRating, setWatchCount, notes, addNote, editNote, deleteNote, reorderNotes, exportJSON, importJSON, clearAll, snapshot, mergeRemote],
+    [data, setSeen, setRating, authorRatings, setAuthorRating, clearAuthorRating, setWatchCount, notes, addNote, editNote, deleteNote, reorderNotes, exportJSON, importJSON, clearAll, snapshot, mergeRemote],
   );
 
   return <C.Provider value={value}>{children}</C.Provider>;

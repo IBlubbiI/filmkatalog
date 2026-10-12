@@ -5,11 +5,13 @@ import {
   emptyFilters,
   facetCounts,
   matches,
+  ratingValue,
   type FilterState,
   type FskValue,
   type SeenValue,
 } from '../lib/filters';
 import { useData } from '../lib/data';
+import { NOTE_AUTHORS, authorColor } from '../lib/authors';
 import { IconClose, IconCheck } from './Icons';
 
 interface Props {
@@ -131,6 +133,11 @@ export function FilterSheet({ open, onClose, movies, state, setState }: Props) {
   const nDv = countExcept('hdr', (m) => m.hasDolbyVision);
   const nAtmos = countExcept('atmos', (m) => m.atmos === 'Ja');
   const nEc = countExcept('extendedCut', (m) => m.extendedCut);
+
+  // Wie viele Filme hat der jeweilige Autor (bzw. „Gesamt") bewertet – unter den übrigen Filtern.
+  const ratingAuthors = useMemo(() => [...new Set([...NOTE_AUTHORS, ...movies.flatMap((m) => Object.keys(m.ratings ?? {}))])], [movies]);
+  const ratingCount = (author: string | null) =>
+    movies.filter((m) => matches(m, state, 'rating') && ratingValue(m, author) != null).length;
 
   const fskOptions: FskValue[] = [0, 6, 12, 16, 18, 'unbekannt'];
   const runtimeMinMax = useMemo(() => {
@@ -393,6 +400,65 @@ export function FilterSheet({ open, onClose, movies, state, setState }: Props) {
               {(['ja', 'nein', 'unbekannt'] as SeenValue[]).map((v) => (
                 <Chip key={v} label={v} count={seenC.get(v) ?? 0} active={state.seen.includes(v)} onClick={() => toggleArr('seen', v)} />
               ))}
+            </div>
+          </Section>
+
+          <Section
+            title="Bewertung"
+            hint={state.ratingMin != null ? `ab ${state.ratingMin.toFixed(1).replace('.', ',')}` : 'egal'}
+          >
+            {/* Wessen Bewertung zählt: Gesamt (Durchschnitt) oder ein einzelner Autor */}
+            <div className="mb-3 flex flex-wrap gap-2">
+              {[null, ...ratingAuthors].map((a) => {
+                const active = state.ratingMin != null && state.ratingAuthor === a;
+                const color = a ? authorColor(a) : undefined;
+                return (
+                  <button
+                    key={a ?? 'gesamt'}
+                    type="button"
+                    // Autor wählen; war noch kein Mindestwert gesetzt, zeigt „ab 1,0" alle bewerteten Filme.
+                    onClick={() => setState((s) => ({ ...s, ratingAuthor: a, ratingMin: s.ratingMin ?? 1 }))}
+                    className={`chip border ${
+                      active
+                        ? color
+                          ? 'bg-ink-800'
+                          : 'border-accent bg-accent/15 text-accent-soft'
+                        : 'border-ink-700 bg-ink-800 text-zinc-300 hover:border-ink-600'
+                    }`}
+                    style={active && color ? { color, borderColor: color } : undefined}
+                  >
+                    {active && <IconCheck width={13} height={13} />}
+                    {a ?? 'Gesamt'}
+                    <span className={active ? 'opacity-70' : 'text-zinc-500'}>({ratingCount(a)})</span>
+                  </button>
+                );
+              })}
+            </div>
+            <input
+              type="range"
+              min={1}
+              max={10}
+              step={0.5}
+              value={state.ratingMin ?? 1}
+              onChange={(e) => setState((s) => ({ ...s, ratingMin: Number(e.target.value) }))}
+              className="w-full"
+              style={{ accentColor: state.ratingAuthor ? authorColor(state.ratingAuthor) : undefined }}
+            />
+            <div className="mt-1 flex items-center justify-between text-xs text-zinc-500">
+              <span>1,0</span>
+              <div className="flex gap-2">
+                {[6, 7, 8].map((v) => (
+                  <button key={v} onClick={() => setState((s) => ({ ...s, ratingMin: v }))} className="text-accent-soft hover:underline">
+                    ≥ {v}
+                  </button>
+                ))}
+                {state.ratingMin != null && (
+                  <button onClick={() => setState((s) => ({ ...s, ratingMin: null, ratingAuthor: null }))} className="text-zinc-400 hover:underline">
+                    Reset
+                  </button>
+                )}
+              </div>
+              <span>10,0</span>
             </div>
           </Section>
         </div>

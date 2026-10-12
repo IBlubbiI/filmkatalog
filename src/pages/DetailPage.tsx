@@ -7,6 +7,7 @@ import DOMPurify from 'dompurify';
 import { useData } from '../lib/data';
 import { useCatalog } from '../lib/catalogState';
 import { useUserData, type Note } from '../lib/userData';
+import { NOTE_AUTHORS, NOTE_AUTHOR_KEY, authorColor } from '../lib/authors';
 import { PosterImage } from '../components/PosterImage';
 import { backdropUrl, formatRuntime, ratingPercent, yearLabel, fskLabel } from '../lib/format';
 import { IconChevronLeft, IconStar, IconHome, IconCheck, IconClose } from '../components/Icons';
@@ -159,22 +160,90 @@ const RATING_LEGEND: { n: number; label: string; hint: string }[] = [
 
 function MyRatingPanel({ movie }: { movie: Movie }) {
   const data = useData();
-  const { entry, setSeen, setRating, setWatchCount } = useUserData();
+  const { entry, authorRatings, setAuthorRating, clearAuthorRating, setSeen, setWatchCount } = useUserData();
   const [showLegend, setShowLegend] = useState(false);
   // Bewertung gilt film-weit: immer am Gruppen-Primär speichern, egal welche Ausgabe offen ist
   const rid = (movie.groupId && data.groups.get(movie.groupId)?.[0]?.id) || movie.id;
   const e = entry(rid);
-  const rating = e.rating ?? movie.rating ?? null;
+  const ratings = authorRatings(rid);
   const seen = e.seen ?? movie.seen ?? false;
   const watchCount = e.watchCount ?? (seen ? 1 : 0);
+
+  // Ausgewählter Autor (geteilt mit den Notizen, damit „wer bewertet/schreibt" konsistent ist).
+  const [author, setAuthor] = useState<string>(() => {
+    try {
+      return localStorage.getItem(NOTE_AUTHOR_KEY) || NOTE_AUTHORS[0];
+    } catch {
+      return NOTE_AUTHORS[0];
+    }
+  });
+  const pickAuthor = (a: string) => {
+    setAuthor(a);
+    try {
+      localStorage.setItem(NOTE_AUTHOR_KEY, a);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const color = authorColor(author);
+  const myValue = ratings[author]?.value ?? null; // Bewertung des aktiven Autors
+  const agg = e.rating ?? movie.rating ?? null; // Durchschnitt aller Autoren (Katalog-Wertung)
+  // Autoren mit aktiver Bewertung (feste Reihenfolge zuerst, dann weitere), für die Übersicht.
+  const rated = [...new Set([...NOTE_AUTHORS, ...Object.keys(ratings)])].filter((a) => ratings[a]?.value != null);
+  const authorChips = [...new Set([...NOTE_AUTHORS, ...Object.keys(ratings)])];
 
   return (
     <section className="mt-5 rounded-xl bg-ink-800/60 p-4 ring-1 ring-white/5">
       <div className="mb-2 flex items-baseline justify-between">
         <h3 className="text-sm font-semibold text-zinc-200">Meine Bewertung</h3>
         <span className="tabular-nums text-3xl font-bold leading-none text-accent-soft">
-          {rating != null ? rating.toFixed(1) : '–'}
+          {agg != null ? agg.toFixed(1) : '–'}
           <span className="text-2xl font-semibold text-zinc-500">/10</span>
+        </span>
+      </div>
+
+      {/* Übersicht: Bewertung je Autor als farbige Badges */}
+      {rated.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {rated.map((a) => (
+            <span
+              key={a}
+              className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium"
+              style={{ color: authorColor(a), borderColor: authorColor(a) }}
+            >
+              {a}
+              <span className="tabular-nums font-bold">{ratings[a]!.value!.toFixed(1)}</span>
+            </span>
+          ))}
+          {rated.length > 1 && <span className="inline-flex items-center px-1 text-xs text-zinc-500">Ø {agg?.toFixed(1)}</span>}
+        </div>
+      )}
+
+      {/* Autor wählen – wessen Bewertung wird gesetzt */}
+      <div className="mb-2 flex flex-wrap gap-1.5">
+        {authorChips.map((a) => {
+          const active = a === author;
+          return (
+            <button
+              key={a}
+              onClick={() => pickAuthor(a)}
+              className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${active ? '' : 'border-ink-600 text-zinc-400 hover:text-zinc-200'}`}
+              style={active ? { color: authorColor(a), borderColor: authorColor(a) } : undefined}
+            >
+              {a}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mb-1 flex items-baseline justify-between">
+        <span className="text-xs text-zinc-500">
+          Bewertung von <span style={{ color }}>{author}</span>
+        </span>
+        <span className="tabular-nums text-2xl font-bold leading-none" style={{ color }}>
+          {myValue != null ? myValue.toFixed(1) : '–'}
+          <span className="text-lg font-semibold text-zinc-500">/10</span>
         </span>
       </div>
       <input
@@ -182,15 +251,16 @@ function MyRatingPanel({ movie }: { movie: Movie }) {
         min={1}
         max={10}
         step={0.1}
-        value={rating ?? 7.5}
-        onChange={(ev) => setRating(rid, Number(ev.target.value))}
-        className="w-full accent-accent"
-        aria-label="Bewertung"
+        value={myValue ?? 7.5}
+        onChange={(ev) => setAuthorRating(rid, author, Number(ev.target.value))}
+        className="w-full"
+        style={{ accentColor: color }}
+        aria-label={`Bewertung von ${author}`}
       />
       <div className="mt-0.5 flex items-center justify-between text-[11px] text-zinc-500">
         <span>1,0</span>
-        {rating != null ? (
-          <button onClick={() => setRating(rid, null)} className="text-zinc-400 hover:underline">
+        {myValue != null ? (
+          <button onClick={() => clearAuthorRating(rid, author)} className="text-zinc-400 hover:underline">
             Bewertung löschen
           </button>
         ) : (
@@ -249,24 +319,6 @@ function MyRatingPanel({ movie }: { movie: Movie }) {
       </div>
     </section>
   );
-}
-
-// Vorschläge für den Autor (erweiterbar – man kann auch einen neuen Namen tippen).
-const NOTE_AUTHORS = ['Thomas', 'Hannah', 'Ursula'];
-const NOTE_AUTHOR_KEY = 'filmkatalog.note.author';
-// Feste Farbe je Autor (Notizen + Name). Unbekannte Autoren bekommen über einen
-// stabilen Hash eine eigene Farbe aus der Palette.
-const AUTHOR_COLORS: Record<string, string> = {
-  Thomas: '#2dd4bf', // Türkis
-  Hannah: '#f87171', // Rot
-  Ursula: '#c084fc', // Violett
-};
-const FALLBACK_COLORS = ['#38bdf8', '#34d399', '#fbbf24', '#f472b6', '#a78bfa', '#fb923c'];
-function authorColor(name: string): string {
-  if (AUTHOR_COLORS[name]) return AUTHOR_COLORS[name];
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-  return FALLBACK_COLORS[h % FALLBACK_COLORS.length];
 }
 
 const noteDate = (ms: number) => new Date(ms).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' });

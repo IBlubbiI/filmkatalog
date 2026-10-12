@@ -36,6 +36,10 @@ function build(state: FilterState): Descriptor[] {
   if (state.franchise) d.push({ label: state.franchise, clear: (s) => ({ ...s, franchise: null }) });
   state.label.forEach((l) => d.push({ label: l, clear: rmFrom('label', l) }));
   state.seen.forEach((v) => d.push({ label: `Gesehen: ${v}`, clear: rmFrom('seen', v) }));
+  if (state.ratingMin != null) {
+    const who = state.ratingAuthor ?? 'Gesamt';
+    d.push({ label: `${who} ≥ ${state.ratingMin.toFixed(1).replace('.', ',')}`, clear: (s) => ({ ...s, ratingMin: null, ratingAuthor: null }) });
+  }
   return d;
 }
 

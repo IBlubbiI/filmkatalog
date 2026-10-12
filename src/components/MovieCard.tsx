@@ -4,6 +4,7 @@ import { PosterImage } from './PosterImage';
 import { formatBadges, yearLabel, formatRuntime } from '../lib/format';
 import { useData } from '../lib/data';
 import { useUserData } from '../lib/userData';
+import { NOTE_AUTHORS, authorColor } from '../lib/authors';
 import { IconStar, IconCheck } from './Icons';
 
 function SeenBadge() {
@@ -27,7 +28,7 @@ function RatingPill({ movie, className = '' }: { movie: Movie; className?: strin
   );
 }
 
-/** Eigene Bewertung: gold gefüllt mit dunkler Schrift – klar abgesetzt von der (dunklen) TMDB-Pille. */
+/** Eigene Bewertung (ohne Autoren-Aufteilung): gold gefüllt – klar abgesetzt von der (dunklen) TMDB-Pille. */
 function OwnRatingPill({ rating }: { rating: number }) {
   return (
     <span
@@ -36,6 +37,19 @@ function OwnRatingPill({ rating }: { rating: number }) {
     >
       <IconStar width={11} height={11} />
       {rating.toFixed(1)}
+    </span>
+  );
+}
+
+/** Bewertung eines einzelnen Autors: in dessen Farbe gefüllt (die Farbe sagt, wer sie vergeben hat). */
+function AuthorRatingPill({ author, value }: { author: string; value: number }) {
+  return (
+    <span
+      className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[11px] font-bold text-ink-950 shadow ring-1 ring-black/10"
+      style={{ backgroundColor: authorColor(author) }}
+      title={`${author}: ${value.toFixed(1)}`}
+    >
+      {value.toFixed(1)}
     </span>
   );
 }
@@ -63,7 +77,12 @@ export function MovieCard({ movie }: { movie: Movie }) {
   const badges = groupBadges.get(movie.id) ?? formatBadges(movie);
   const u = entry(movie.id);
   const seen = u.seen ?? movie.seen ?? false;
+  // Gold = Schnitt/Gesamtwertung (immer, wenn überhaupt bewertet).
   const ownRating = u.rating ?? movie.rating ?? null;
+  // Bewertung je Autor (feste Reihenfolge zuerst, dann weitere).
+  const ratedAuthors = [...new Set([...NOTE_AUTHORS, ...Object.keys(u.ratings ?? {})])].filter((a) => u.ratings?.[a]?.value != null);
+  // Einzelne (farbige) Bewertungen nur zeigen, wenn sie sich unterscheiden – sonst genügt der goldene Schnitt.
+  const showPerAuthor = new Set(ratedAuthors.map((a) => u.ratings![a]!.value!)).size > 1;
   return (
     <Link
       to={`/film/${movie.id}`}
@@ -76,6 +95,7 @@ export function MovieCard({ movie }: { movie: Movie }) {
           <div className="flex flex-col items-end gap-1">
             <RatingPill movie={movie} />
             {ownRating != null && <OwnRatingPill rating={ownRating} />}
+            {showPerAuthor && ratedAuthors.map((a) => <AuthorRatingPill key={a} author={a} value={u.ratings![a]!.value!} />)}
           </div>
           <div className="flex items-end justify-between gap-1">
             <Badges movie={movie} badges={badges} />

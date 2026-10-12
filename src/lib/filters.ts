@@ -26,6 +26,8 @@ export interface FilterState {
   atmosOnly: boolean;
   extendedCutOnly: boolean;
   seen: SeenValue[];
+  ratingAuthor: string | null; // null = Gesamt-/Durchschnittswertung, sonst Autor (Thomas/Hannah/…)
+  ratingMin: number | null; // Mindestwertung (1–10); null = kein Bewertungsfilter
 }
 
 export const DISC_FORMATS = ['DVD', 'Blu-ray', '4K UHD', '4K UHD + Blu-ray'];
@@ -51,8 +53,14 @@ export function emptyFilters(): FilterState {
     atmosOnly: false,
     extendedCutOnly: false,
     seen: [],
+    ratingAuthor: null,
+    ratingMin: null,
   };
 }
+
+// Wertung eines Films aus Sicht des Filters: ein bestimmter Autor oder (null) die Gesamtwertung.
+export const ratingValue = (m: Movie, author: string | null): number | null =>
+  author ? (m.ratings?.[author]?.value ?? null) : m.rating;
 
 const seenOf = (m: Movie): SeenValue => (m.seen === true ? 'ja' : m.seen === false ? 'nein' : 'unbekannt');
 
@@ -88,6 +96,11 @@ export const DIMS: Record<string, (m: Movie, s: FilterState) => boolean> = {
   atmos: (m, s) => !s.atmosOnly || m.atmos === 'Ja',
   extendedCut: (m, s) => !s.extendedCutOnly || m.extendedCut,
   seen: (m, s) => s.seen.length === 0 || s.seen.includes(seenOf(m)),
+  rating: (m, s) => {
+    if (s.ratingMin == null) return true;
+    const v = ratingValue(m, s.ratingAuthor);
+    return v != null && v >= s.ratingMin;
+  },
 };
 
 const DIM_KEYS = Object.keys(DIMS);
@@ -126,6 +139,7 @@ export function activeCount(s: FilterState): number {
   n += s.atmosOnly ? 1 : 0;
   n += s.extendedCutOnly ? 1 : 0;
   n += s.seen.length;
+  n += s.ratingMin != null ? 1 : 0;
   return n;
 }
 

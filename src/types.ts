@@ -74,6 +74,8 @@ export interface Movie {
   rating: number | null;
   /** Zur Laufzeit aus den App-Daten überlagert (für Sortierung „Gesehen"). */
   watchCount?: number;
+  /** Zur Laufzeit aus den App-Daten überlagert: Bewertung je Autor (für Filter & Karte). */
+  ratings?: Record<string, { value: number | null; at: number }>;
   lentTo: string | null;
   type: 'Film' | 'Serie';
   posterUrl: string | null; // eigenes hochgeladenes Poster (Supabase Storage) – überschreibt TMDB
