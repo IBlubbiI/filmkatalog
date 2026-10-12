@@ -250,6 +250,20 @@ function MyRatingPanel({ movie }: { movie: Movie }) {
 // Vorschläge für den Autor (erweiterbar – man kann auch einen neuen Namen tippen).
 const NOTE_AUTHORS = ['Thomas', 'Hannah', 'Ursula'];
 const NOTE_AUTHOR_KEY = 'filmkatalog.note.author';
+// Feste Farbe je Autor (Notizen + Name). Unbekannte Autoren bekommen über einen
+// stabilen Hash eine eigene Farbe aus der Palette.
+const AUTHOR_COLORS: Record<string, string> = {
+  Thomas: '#2dd4bf', // Türkis
+  Hannah: '#f87171', // Rot
+  Ursula: '#c084fc', // Violett
+};
+const FALLBACK_COLORS = ['#38bdf8', '#34d399', '#fbbf24', '#f472b6', '#a78bfa', '#fb923c'];
+function authorColor(name: string): string {
+  if (AUTHOR_COLORS[name]) return AUTHOR_COLORS[name];
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return FALLBACK_COLORS[h % FALLBACK_COLORS.length];
+}
 
 const noteDate = (ms: number) => new Date(ms).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' });
 // Zeilenzahl grob aus dem Text schätzen (für die Höhe der Papier-Textfelder).
@@ -298,21 +312,25 @@ function NotesPanel({ movie }: { movie: Movie }) {
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="mr-0.5 text-xs text-zinc-500">Autor:</span>
-          {authorOptions.map((a) => (
-            <button
-              key={a}
-              type="button"
-              onClick={() => {
-                setAuthor(a);
-                setAddingAuthor(false);
-              }}
-              className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
-                !addingAuthor && author === a ? 'bg-accent/20 text-accent-soft ring-1 ring-accent/40' : 'bg-ink-700 text-zinc-300 hover:bg-ink-600'
-              }`}
-            >
-              {a}
-            </button>
-          ))}
+          {authorOptions.map((a) => {
+            const active = !addingAuthor && author === a;
+            return (
+              <button
+                key={a}
+                type="button"
+                onClick={() => {
+                  setAuthor(a);
+                  setAddingAuthor(false);
+                }}
+                style={active ? { color: authorColor(a), borderColor: authorColor(a) } : undefined}
+                className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                  active ? 'bg-ink-800' : 'border-transparent bg-ink-700 text-zinc-300 hover:bg-ink-600'
+                }`}
+              >
+                {a}
+              </button>
+            );
+          })}
           {addingAuthor ? (
             <input
               autoFocus
@@ -356,7 +374,11 @@ function NotesPanel({ movie }: { movie: Movie }) {
       {list.length > 0 && (
         <ul className="mt-4 space-y-2.5">
           {list.map((n) => (
-            <li key={n.id} className="overflow-hidden rounded-lg border-l-2 border-accent/60 bg-ink-850 ring-1 ring-white/5">
+            <li
+              key={n.id}
+              className="overflow-hidden rounded-lg border-l-[3px] bg-ink-850 ring-1 ring-white/5"
+              style={{ borderLeftColor: authorColor(n.author) }}
+            >
               {editingId === n.id ? (
                 <div className="p-3">
                   <textarea
@@ -378,10 +400,10 @@ function NotesPanel({ movie }: { movie: Movie }) {
               ) : (
                 <>
                   <div className="flex items-baseline justify-between px-3 pt-2.5">
-                    <span className="text-sm font-semibold text-accent-soft/90">{n.author}</span>
+                    <span className="text-sm font-semibold" style={{ color: authorColor(n.author) }}>{n.author}</span>
                     <span className="text-xs text-zinc-500">{noteDate(n.at)}</span>
                   </div>
-                  <p className="whitespace-pre-wrap px-3 pt-1 text-sm leading-relaxed text-zinc-200">{n.text}</p>
+                  <p className="whitespace-pre-wrap px-3 pt-1 text-sm leading-relaxed" style={{ color: authorColor(n.author) }}>{n.text}</p>
                   <div className="flex justify-end gap-3 px-3 pb-2 pt-1.5 text-[11px] text-zinc-500">
                     <button
                       onClick={() => {
