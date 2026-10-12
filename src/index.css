@@ -53,6 +53,16 @@ html[data-theme='light'] body {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  /* Notiz-Editor (contenteditable): Platzhalter, wenn leer */
+  .note-editor:empty::before {
+    content: attr(data-placeholder);
+    color: #52525b;
+    pointer-events: none;
+  }
+  .note-editor:focus {
+    outline: none;
+  }
 }
 
 /* sanftes Fokus-Styling für Touch/Tastatur */

@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import DOMPurify from 'dompurify';
 import { useData } from '../lib/data';
 import { useCatalog } from '../lib/catalogState';
 import { useUserData, type Note } from '../lib/userData';
@@ -269,8 +270,97 @@ function authorColor(name: string): string {
 }
 
 const noteDate = (ms: number) => new Date(ms).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' });
-// Zeilenzahl grob aus dem Text schätzen (für die Höhe der Papier-Textfelder).
-const paperRows = (t: string) => Math.max(3, t.split('\n').length, Math.ceil(t.length / 42));
+
+// Erlaubte Formatierung in Notizen (Fett/Kursiv/Unterstrichen/Hoch-/Tiefgestellt/Farbe).
+const NOTE_SANITIZE = {
+  ALLOWED_TAGS: ['b', 'strong', 'i', 'em', 'u', 'sup', 'sub', 'span', 'font', 'br', 'div', 'p'],
+  ALLOWED_ATTR: ['style', 'color'],
+};
+const sanitizeNote = (html: string) => DOMPurify.sanitize(html, NOTE_SANITIZE);
+const htmlToText = (html: string) => {
+  const d = document.createElement('div');
+  d.innerHTML = html;
+  return (d.textContent || '').trim();
+};
+
+const NOTE_COLORS: { c: string; label: string }[] = [
+  { c: '#e4e4e7', label: 'Weiß (Standard)' },
+  { c: '#2dd4bf', label: 'Türkis' },
+  { c: '#f87171', label: 'Rot' },
+  { c: '#c084fc', label: 'Violett' },
+  { c: '#fbbf24', label: 'Gelb' },
+  { c: '#38bdf8', label: 'Blau' },
+  { c: '#4ade80', label: 'Grün' },
+];
+
+// Kleiner WYSIWYG-Editor (wie in Word): Text markieren, Button klicken.
+function RichNoteEditor({ initialHtml, onChange, placeholder, minHeight = 80 }: { initialHtml: string; onChange: (html: string) => void; placeholder?: string; minHeight?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.innerHTML = initialHtml || '';
+    // nur beim Mount setzen, sonst springt der Cursor
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const sync = () => onChange(ref.current?.innerHTML || '');
+  const run = (cmd: string, value?: string) => {
+    ref.current?.focus();
+    try {
+      document.execCommand('styleWithCSS', false, 'true');
+    } catch {
+      /* egal */
+    }
+    document.execCommand(cmd, false, value);
+    sync();
+  };
+  const btn = 'flex h-7 min-w-[1.75rem] items-center justify-center rounded px-1.5 text-sm text-zinc-300 hover:bg-ink-700';
+  return (
+    <div className="rounded-lg border border-ink-700 bg-ink-800 focus-within:border-accent/60">
+      <div className="flex flex-wrap items-center gap-0.5 border-b border-ink-700 px-1.5 py-1">
+        <button type="button" title="Fett" onMouseDown={(e) => e.preventDefault()} onClick={() => run('bold')} className={btn}>
+          <span className="font-bold">F</span>
+        </button>
+        <button type="button" title="Kursiv" onMouseDown={(e) => e.preventDefault()} onClick={() => run('italic')} className={btn}>
+          <span className="italic">K</span>
+        </button>
+        <button type="button" title="Unterstrichen" onMouseDown={(e) => e.preventDefault()} onClick={() => run('underline')} className={btn}>
+          <span className="underline">U</span>
+        </button>
+        <button type="button" title="Hochgestellt" onMouseDown={(e) => e.preventDefault()} onClick={() => run('superscript')} className={btn}>
+          x<sup>2</sup>
+        </button>
+        <button type="button" title="Tiefgestellt" onMouseDown={(e) => e.preventDefault()} onClick={() => run('subscript')} className={btn}>
+          x<sub>2</sub>
+        </button>
+        <span className="mx-1 h-5 w-px bg-ink-700" />
+        {NOTE_COLORS.map((col) => (
+          <button
+            key={col.c}
+            type="button"
+            title={`Farbe: ${col.label}`}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => run('foreColor', col.c)}
+            className="h-5 w-5 rounded-full ring-1 ring-black/40"
+            style={{ backgroundColor: col.c }}
+          />
+        ))}
+        <span className="mx-1 h-5 w-px bg-ink-700" />
+        <button type="button" title="Formatierung entfernen" onMouseDown={(e) => e.preventDefault()} onClick={() => run('removeFormat')} className={`${btn} text-zinc-400`}>
+          ⌫
+        </button>
+      </div>
+      <div
+        ref={ref}
+        contentEditable
+        suppressContentEditableWarning
+        onInput={sync}
+        data-placeholder={placeholder}
+        className="note-editor w-full resize-y overflow-auto px-3 py-2 text-sm leading-relaxed text-zinc-100"
+        style={{ minHeight }}
+      />
+      <p className="px-3 pb-1.5 text-[11px] text-zinc-600">Text markieren, dann Knopf klicken · F = Fett, K = Kursiv, U = Unterstrichen</p>
+    </div>
+  );
+}
 
 function NotesPanel({ movie }: { movie: Movie }) {
   const data = useData();
@@ -286,17 +376,19 @@ function NotesPanel({ movie }: { movie: Movie }) {
       return NOTE_AUTHORS[0];
     }
   });
-  const [text, setText] = useState('');
+  const [text, setText] = useState(''); // HTML aus dem Editor
+  const [composerKey, setComposerKey] = useState(0); // zum Leeren des Editors nach dem Speichern
   const [addingAuthor, setAddingAuthor] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const authorOptions = [...new Set([...NOTE_AUTHORS, ...list.map((n) => n.author)])];
 
   const submit = () => {
-    const t = text.trim();
-    if (!t) return;
-    addNote(rid, author, t);
+    const html = sanitizeNote(text);
+    if (!htmlToText(html)) return;
+    addNote(rid, author, html);
     setText('');
+    setComposerKey((k) => k + 1); // Editor leeren
     try {
       if (author.trim()) localStorage.setItem(NOTE_AUTHOR_KEY, author.trim());
     } catch {
@@ -304,7 +396,8 @@ function NotesPanel({ movie }: { movie: Movie }) {
     }
   };
   const saveEdit = () => {
-    if (editingId && editText.trim()) editNote(rid, editingId, editText);
+    const html = sanitizeNote(editText);
+    if (editingId && htmlToText(html)) editNote(rid, editingId, html);
     setEditingId(null);
   };
   const onDragEnd = (e: DragEndEvent) => {
@@ -365,17 +458,11 @@ function NotesPanel({ movie }: { movie: Movie }) {
             </button>
           )}
         </div>
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          rows={3}
-          placeholder="Deine Gedanken zum Film…"
-          className="w-full resize-y rounded-lg border border-ink-700 bg-ink-800 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-accent/60"
-        />
+        <RichNoteEditor key={composerKey} initialHtml="" onChange={setText} placeholder="Deine Gedanken zum Film…" minHeight={90} />
         <div className="flex justify-end">
           <button
             onClick={submit}
-            disabled={!text.trim()}
+            disabled={!htmlToText(text)}
             className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-ink-950 hover:bg-accent-soft disabled:opacity-40"
           >
             Notiz hinzufügen
@@ -444,13 +531,7 @@ function SortableNote({
     >
       {editing ? (
         <div className="p-3">
-          <textarea
-            autoFocus
-            value={editText}
-            onChange={(e) => setEditText(e.target.value)}
-            rows={paperRows(editText)}
-            className="w-full resize-y rounded-lg border border-ink-700 bg-ink-800 px-3 py-2 text-sm text-zinc-100 focus:border-accent/60"
-          />
+          <RichNoteEditor initialHtml={editText} onChange={setEditText} minHeight={70} />
           <div className="mt-2 flex justify-end gap-2">
             <button onClick={onCancelEdit} className="rounded px-3 py-1 text-xs font-medium text-zinc-400 hover:bg-ink-700">
               Abbrechen
@@ -486,7 +567,10 @@ function SortableNote({
             </span>
             <span className="shrink-0 text-xs text-zinc-500">{noteDate(n.at)}</span>
           </div>
-          <p className="whitespace-pre-wrap px-3 pt-1 text-sm leading-relaxed text-zinc-200">{n.text}</p>
+          <div
+            className="whitespace-pre-wrap px-3 pt-1 text-sm leading-relaxed text-zinc-200 [&_sub]:text-[0.75em] [&_sup]:text-[0.75em]"
+            dangerouslySetInnerHTML={{ __html: sanitizeNote(n.text) }}
+          />
           <div className="flex justify-end gap-3 px-3 pb-2 pt-1.5 text-[11px] text-zinc-500">
             <button onClick={onStartEdit} className="hover:text-zinc-300">
               Bearbeiten
