@@ -211,7 +211,17 @@ function toMovie(r) {
 
   const year = firstYear(r['Jahr']);
   const yearRaw = clean(r['Jahr']); // reines "–" -> null, Bereiche wie "2010–2013" bleiben
-  const decade = year ? `${Math.floor(year / 10) * 10}er` : null;
+  const decade = year ? `${Math.floor(year / 10) * 10}er` : null; // primäres (Start-)Jahrzehnt
+  // Alle betroffenen Jahrzehnte – bei Boxen mit Jahresbereich (z. B. "1925-1951")
+  // damit der Jahrzehnt-Filter sie in JEDEM enthaltenen Jahrzehnt findet.
+  const decades = (() => {
+    if (!year) return [];
+    const all = (String(yearRaw || '').match(/\b(1[89]\d{2}|20\d{2})\b/g) || []).map(Number);
+    const end = all.length > 1 ? Math.max(...all) : year;
+    const out = [];
+    for (let d = Math.floor(year / 10) * 10; d <= Math.floor(end / 10) * 10; d += 10) out.push(`${d}er`);
+    return out;
+  })();
 
   const discFormat = clean(r['Discformat(e)']);
   const is4kDisc = !!discFormat && discFormat.includes('4K UHD');
@@ -246,6 +256,7 @@ function toMovie(r) {
     year,
     yearRaw,
     decade,
+    decades,
     // Disc / Format
     discFormat,
     is4kDisc,

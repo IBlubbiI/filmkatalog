@@ -34,7 +34,8 @@ export interface Movie {
   mainGenre: string | null;
   year: number | null;
   yearRaw: string | null;
-  decade: string | null;
+  decade: string | null; // primäres (Start-)Jahrzehnt
+  decades: string[]; // alle betroffenen Jahrzehnte (für den Filter; Boxen mit Jahresbereich)
   discFormat: string | null;
   is4kDisc: boolean;
   hasBluray: boolean;

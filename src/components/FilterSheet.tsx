@@ -109,7 +109,7 @@ export function FilterSheet({ open, onClose, movies, state, setState }: Props) {
     () => facetCounts<FskValue>(movies, state, 'fsk', (m) => (m.fsk == null ? 'unbekannt' : m.fsk)),
     [movies, state],
   );
-  const decadeC = useMemo(() => facetCounts(movies, state, 'decade', (m) => m.decade), [movies, state]);
+  const decadeC = useMemo(() => facetCounts(movies, state, 'decade', (m) => m.decades ?? (m.decade ? [m.decade] : [])), [movies, state]);
   const catC = useMemo(() => facetCounts(movies, state, 'category', (m) => m.category), [movies, state]);
   const arC = useMemo(() => facetCounts(movies, state, 'aspectRatio', (m) => m.aspectRatio ?? 'unbekannt'), [movies, state]);
   const seenC = useMemo(

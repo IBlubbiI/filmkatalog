@@ -168,7 +168,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       for (const d of m.directors) dirCount.set(d, (dirCount.get(d) ?? 0) + 1);
       if (m.franchise) franCount.set(m.franchise, (franCount.get(m.franchise) ?? 0) + 1);
       if (m.labelMain) labelCount.set(m.labelMain, (labelCount.get(m.labelMain) ?? 0) + 1);
-      if (m.decade) decadeSet.add(m.decade);
+      for (const d of m.decades ?? (m.decade ? [m.decade] : [])) decadeSet.add(d);
       if (m.universe) {
         const arr = byUniverse.get(m.universe) ?? [];
         arr.push(m);

@@ -83,7 +83,7 @@ export const DIMS: Record<string, (m: Movie, s: FilterState) => boolean> = {
   franchise: (m, s) => !s.franchise || m.franchise === s.franchise,
   category: (m, s) => s.category.length === 0 || (!!m.category && s.category.includes(m.category)),
   label: (m, s) => s.label.length === 0 || (!!m.labelMain && s.label.includes(m.labelMain)),
-  decade: (m, s) => s.decade.length === 0 || (!!m.decade && s.decade.includes(m.decade)),
+  decade: (m, s) => s.decade.length === 0 || (m.decades ?? (m.decade ? [m.decade] : [])).some((d) => s.decade.includes(d)),
   runtime: (m, s) => s.runtimeMax == null || (m.runtime != null && m.runtime <= s.runtimeMax),
   atmos: (m, s) => !s.atmosOnly || m.atmos === 'Ja',
   extendedCut: (m, s) => !s.extendedCutOnly || m.extendedCut,
