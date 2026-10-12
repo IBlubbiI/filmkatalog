@@ -316,19 +316,19 @@ function RichNoteEditor({ initialHtml, onChange, placeholder, minHeight = 80 }: 
   return (
     <div className="rounded-lg border border-ink-700 bg-ink-800 focus-within:border-accent/60">
       <div className="flex flex-wrap items-center gap-0.5 border-b border-ink-700 px-1.5 py-1">
-        <button type="button" title="Fett" onMouseDown={(e) => e.preventDefault()} onClick={() => run('bold')} className={btn}>
+        <button type="button" title="Fett" onPointerDown={(e) => e.preventDefault()} onClick={() => run('bold')} className={btn}>
           <span className="font-bold">F</span>
         </button>
-        <button type="button" title="Kursiv" onMouseDown={(e) => e.preventDefault()} onClick={() => run('italic')} className={btn}>
+        <button type="button" title="Kursiv" onPointerDown={(e) => e.preventDefault()} onClick={() => run('italic')} className={btn}>
           <span className="italic">K</span>
         </button>
-        <button type="button" title="Unterstrichen" onMouseDown={(e) => e.preventDefault()} onClick={() => run('underline')} className={btn}>
+        <button type="button" title="Unterstrichen" onPointerDown={(e) => e.preventDefault()} onClick={() => run('underline')} className={btn}>
           <span className="underline">U</span>
         </button>
-        <button type="button" title="Hochgestellt" onMouseDown={(e) => e.preventDefault()} onClick={() => run('superscript')} className={btn}>
+        <button type="button" title="Hochgestellt" onPointerDown={(e) => e.preventDefault()} onClick={() => run('superscript')} className={btn}>
           x<sup>2</sup>
         </button>
-        <button type="button" title="Tiefgestellt" onMouseDown={(e) => e.preventDefault()} onClick={() => run('subscript')} className={btn}>
+        <button type="button" title="Tiefgestellt" onPointerDown={(e) => e.preventDefault()} onClick={() => run('subscript')} className={btn}>
           x<sub>2</sub>
         </button>
         <span className="mx-1 h-5 w-px bg-ink-700" />
@@ -337,14 +337,14 @@ function RichNoteEditor({ initialHtml, onChange, placeholder, minHeight = 80 }: 
             key={col.c}
             type="button"
             title={`Farbe: ${col.label}`}
-            onMouseDown={(e) => e.preventDefault()}
+            onPointerDown={(e) => e.preventDefault()}
             onClick={() => run('foreColor', col.c)}
             className="h-5 w-5 rounded-full ring-1 ring-black/40"
             style={{ backgroundColor: col.c }}
           />
         ))}
         <span className="mx-1 h-5 w-px bg-ink-700" />
-        <button type="button" title="Formatierung entfernen" onMouseDown={(e) => e.preventDefault()} onClick={() => run('removeFormat')} className={`${btn} text-zinc-400`}>
+        <button type="button" title="Formatierung entfernen" onPointerDown={(e) => e.preventDefault()} onClick={() => run('removeFormat')} className={`${btn} text-zinc-400`}>
           ⌫
         </button>
       </div>
