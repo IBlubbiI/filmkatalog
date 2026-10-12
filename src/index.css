@@ -63,6 +63,20 @@ html[data-theme='light'] body {
   .note-editor:focus {
     outline: none;
   }
+  /* Listen in Notizen (Tailwind-Preflight entfernt sonst Aufzählungszeichen) */
+  .note-content ul {
+    list-style: disc;
+    margin: 0.25rem 0;
+    padding-left: 1.4rem;
+  }
+  .note-content ol {
+    list-style: decimal;
+    margin: 0.25rem 0;
+    padding-left: 1.5rem;
+  }
+  .note-content li {
+    margin: 0.1rem 0;
+  }
 }
 
 /* sanftes Fokus-Styling für Touch/Tastatur */

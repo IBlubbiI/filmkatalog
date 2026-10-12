@@ -273,7 +273,7 @@ const noteDate = (ms: number) => new Date(ms).toLocaleDateString('de-DE', { day:
 
 // Erlaubte Formatierung in Notizen (Fett/Kursiv/Unterstrichen/Hoch-/Tiefgestellt/Farbe).
 const NOTE_SANITIZE = {
-  ALLOWED_TAGS: ['b', 'strong', 'i', 'em', 'u', 'sup', 'sub', 'span', 'font', 'br', 'div', 'p'],
+  ALLOWED_TAGS: ['b', 'strong', 'i', 'em', 'u', 'sup', 'sub', 'span', 'font', 'br', 'div', 'p', 'ul', 'ol', 'li'],
   ALLOWED_ATTR: ['style', 'color'],
 };
 const sanitizeNote = (html: string) => DOMPurify.sanitize(html, NOTE_SANITIZE);
@@ -315,7 +315,17 @@ function RichNoteEditor({ initialHtml, onChange, placeholder, minHeight = 80 }: 
   const btn = 'flex h-7 min-w-[1.75rem] items-center justify-center rounded px-1.5 text-sm text-zinc-300 hover:bg-ink-700';
   return (
     <div className="rounded-lg border border-ink-700 bg-ink-800 focus-within:border-accent/60">
-      <div className="flex flex-wrap items-center gap-0.5 border-b border-ink-700 px-1.5 py-1">
+      <div
+        ref={ref}
+        contentEditable
+        suppressContentEditableWarning
+        onInput={sync}
+        data-placeholder={placeholder}
+        className="note-editor note-content w-full resize-y overflow-auto px-3 py-2 text-sm leading-relaxed text-zinc-100"
+        style={{ minHeight }}
+      />
+      {/* Formatierungsleiste UNTER dem Textfeld */}
+      <div className="flex flex-wrap items-center gap-0.5 border-t border-ink-700 px-1.5 py-1">
         <button type="button" title="Fett" onPointerDown={(e) => e.preventDefault()} onClick={() => run('bold')} className={btn}>
           <span className="font-bold">F</span>
         </button>
@@ -328,8 +338,26 @@ function RichNoteEditor({ initialHtml, onChange, placeholder, minHeight = 80 }: 
         <button type="button" title="Hochgestellt" onPointerDown={(e) => e.preventDefault()} onClick={() => run('superscript')} className={btn}>
           x<sup>2</sup>
         </button>
-        <button type="button" title="Tiefgestellt" onPointerDown={(e) => e.preventDefault()} onClick={() => run('subscript')} className={btn}>
-          x<sub>2</sub>
+        <span className="mx-1 h-5 w-px bg-ink-700" />
+        <button type="button" title="Aufzählung" onPointerDown={(e) => e.preventDefault()} onClick={() => run('insertUnorderedList')} className={btn}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="4" cy="5" r="1.8" />
+            <circle cx="4" cy="12" r="1.8" />
+            <circle cx="4" cy="19" r="1.8" />
+            <rect x="9" y="4" width="12" height="2" rx="1" />
+            <rect x="9" y="11" width="12" height="2" rx="1" />
+            <rect x="9" y="18" width="12" height="2" rx="1" />
+          </svg>
+        </button>
+        <button type="button" title="Nummerierte Liste" onPointerDown={(e) => e.preventDefault()} onClick={() => run('insertOrderedList')} className={btn}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <text x="0.5" y="8" fontSize="8">1</text>
+            <text x="0.5" y="15" fontSize="8">2</text>
+            <text x="0.5" y="22" fontSize="8">3</text>
+            <rect x="9" y="4" width="12" height="2" rx="1" />
+            <rect x="9" y="11" width="12" height="2" rx="1" />
+            <rect x="9" y="18" width="12" height="2" rx="1" />
+          </svg>
         </button>
         <span className="mx-1 h-5 w-px bg-ink-700" />
         {NOTE_COLORS.map((col) => (
@@ -348,16 +376,6 @@ function RichNoteEditor({ initialHtml, onChange, placeholder, minHeight = 80 }: 
           ⌫
         </button>
       </div>
-      <div
-        ref={ref}
-        contentEditable
-        suppressContentEditableWarning
-        onInput={sync}
-        data-placeholder={placeholder}
-        className="note-editor w-full resize-y overflow-auto px-3 py-2 text-sm leading-relaxed text-zinc-100"
-        style={{ minHeight }}
-      />
-      <p className="px-3 pb-1.5 text-[11px] text-zinc-600">Text markieren, dann Knopf klicken · F = Fett, K = Kursiv, U = Unterstrichen</p>
     </div>
   );
 }
@@ -568,7 +586,7 @@ function SortableNote({
             <span className="shrink-0 text-xs text-zinc-500">{noteDate(n.at)}</span>
           </div>
           <div
-            className="whitespace-pre-wrap px-3 pt-1 text-sm leading-relaxed text-zinc-200 [&_sub]:text-[0.75em] [&_sup]:text-[0.75em]"
+            className="note-content whitespace-pre-wrap px-3 pt-1 text-sm leading-relaxed text-zinc-200 [&_sub]:text-[0.75em] [&_sup]:text-[0.75em]"
             dangerouslySetInnerHTML={{ __html: sanitizeNote(n.text) }}
           />
           <div className="flex justify-end gap-3 px-3 pb-2 pt-1.5 text-[11px] text-zinc-500">
