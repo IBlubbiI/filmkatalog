@@ -9,6 +9,7 @@ export interface Note {
   at: number; // erstellt (ms)
   updatedAt: number; // für Merge
   deleted?: boolean; // Tombstone (gelöscht, aber für den Merge erhalten)
+  order?: number; // manuelle Reihenfolge (ms-Skala wie `at`); fehlt → nach `at` (neueste zuerst)
 }
 
 // Vom Nutzer in der App gepflegte Daten (auf dem Gerät gespeichert).
@@ -33,10 +34,11 @@ interface Ctx {
   setSeen: (id: string, seen: boolean) => void;
   setRating: (id: string, rating: number | null) => void;
   setWatchCount: (id: string, n: number) => void;
-  notes: (id: string) => Note[]; // aktive Notizen, neueste zuerst
+  notes: (id: string) => Note[]; // aktive Notizen in Anzeige-Reihenfolge
   addNote: (id: string, author: string, text: string) => void;
   editNote: (id: string, noteId: string, text: string, author?: string) => void;
   deleteNote: (id: string, noteId: string) => void;
+  reorderNotes: (id: string, orderedNoteIds: string[]) => void; // neue Reihenfolge (von oben)
   count: number; // Anzahl Filme mit Daten
   exportJSON: () => void;
   importJSON: (file: File) => Promise<{ ok: boolean; msg: string }>;
@@ -113,9 +115,21 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
     });
   }, []);
   const notes = useCallback(
-    (id: string) => activeNotes(dataRef.current[id]).sort((a, b) => b.at - a.at),
+    // Nach manueller Reihenfolge (order), sonst nach Erstellzeit – jeweils absteigend (neueste/oben zuerst).
+    (id: string) => activeNotes(dataRef.current[id]).sort((a, b) => (b.order ?? b.at) - (a.order ?? a.at)),
     [],
   );
+  // Neue Reihenfolge speichern: order in ms-Skala wie `at`, damit neue Notizen (at≈jetzt)
+  // automatisch oben einsortiert werden, ohne die manuelle Ordnung zu stören.
+  const reorderNotes = useCallback((id: string, orderedNoteIds: string[]) => {
+    const base = Date.now();
+    const pos = new Map(orderedNoteIds.map((nid, i) => [nid, base - i]));
+    setData((d) => {
+      const e = d[id];
+      if (!e?.notes) return d;
+      return { ...d, [id]: { ...e, notes: e.notes.map((n) => (pos.has(n.id) ? { ...n, order: pos.get(n.id)!, updatedAt: Date.now() } : n)) } };
+    });
+  }, []);
 
   const exportJSON = useCallback(() => {
     const blob = new Blob([JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), data: dataRef.current }, null, 2)], {
@@ -187,6 +201,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
       addNote,
       editNote,
       deleteNote,
+      reorderNotes,
       count: Object.values(data).filter(hasData).length,
       exportJSON,
       importJSON,
@@ -194,7 +209,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
       snapshot,
       mergeRemote,
     }),
-    [data, setSeen, setRating, setWatchCount, notes, addNote, editNote, deleteNote, exportJSON, importJSON, clearAll, snapshot, mergeRemote],
+    [data, setSeen, setRating, setWatchCount, notes, addNote, editNote, deleteNote, reorderNotes, exportJSON, importJSON, clearAll, snapshot, mergeRemote],
   );
 
   return <C.Provider value={value}>{children}</C.Provider>;

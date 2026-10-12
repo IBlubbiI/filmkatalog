@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useData } from '../lib/data';
 import { useCatalog } from '../lib/catalogState';
-import { useUserData } from '../lib/userData';
+import { useUserData, type Note } from '../lib/userData';
 import { PosterImage } from '../components/PosterImage';
 import { backdropUrl, formatRuntime, ratingPercent, yearLabel, fskLabel } from '../lib/format';
 import { IconChevronLeft, IconStar, IconHome, IconCheck, IconClose } from '../components/Icons';
@@ -271,7 +274,8 @@ const paperRows = (t: string) => Math.max(3, t.split('\n').length, Math.ceil(t.l
 
 function NotesPanel({ movie }: { movie: Movie }) {
   const data = useData();
-  const { notes, addNote, editNote, deleteNote } = useUserData();
+  const { notes, addNote, editNote, deleteNote, reorderNotes } = useUserData();
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   // Notizen gelten film-weit → immer am Gruppen-Primär speichern (wie die Bewertung).
   const rid = (movie.groupId && data.groups.get(movie.groupId)?.[0]?.id) || movie.id;
   const list = notes(rid);
@@ -302,6 +306,15 @@ function NotesPanel({ movie }: { movie: Movie }) {
   const saveEdit = () => {
     if (editingId && editText.trim()) editNote(rid, editingId, editText);
     setEditingId(null);
+  };
+  const onDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const ids = list.map((n) => n.id);
+    const from = ids.indexOf(String(active.id));
+    const to = ids.indexOf(String(over.id));
+    if (from < 0 || to < 0) return;
+    reorderNotes(rid, arrayMove(ids, from, to));
   };
 
   return (
@@ -370,66 +383,121 @@ function NotesPanel({ movie }: { movie: Movie }) {
         </div>
       </div>
 
-      {/* Bestehende Notizen als Notizzettel */}
+      {/* Bestehende Notizen – per Ziehgriff (⠿) sortierbar */}
       {list.length > 0 && (
-        <ul className="mt-4 space-y-2.5">
-          {list.map((n) => (
-            <li
-              key={n.id}
-              className="overflow-hidden rounded-lg border-l-[3px] bg-ink-850 ring-1 ring-white/5"
-              style={{ borderLeftColor: authorColor(n.author) }}
-            >
-              {editingId === n.id ? (
-                <div className="p-3">
-                  <textarea
-                    autoFocus
-                    value={editText}
-                    onChange={(e) => setEditText(e.target.value)}
-                    rows={paperRows(editText)}
-                    className="w-full resize-y rounded-lg border border-ink-700 bg-ink-800 px-3 py-2 text-sm text-zinc-100 focus:border-accent/60"
-                  />
-                  <div className="mt-2 flex justify-end gap-2">
-                    <button onClick={() => setEditingId(null)} className="rounded px-3 py-1 text-xs font-medium text-zinc-400 hover:bg-ink-700">
-                      Abbrechen
-                    </button>
-                    <button onClick={saveEdit} disabled={!editText.trim()} className="rounded bg-accent px-3 py-1 text-xs font-bold text-ink-950 hover:bg-accent-soft disabled:opacity-40">
-                      Speichern
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-baseline justify-between px-3 pt-2.5">
-                    <span className="text-sm font-semibold" style={{ color: authorColor(n.author) }}>{n.author}</span>
-                    <span className="text-xs text-zinc-500">{noteDate(n.at)}</span>
-                  </div>
-                  <p className="whitespace-pre-wrap px-3 pt-1 text-sm leading-relaxed text-zinc-200">{n.text}</p>
-                  <div className="flex justify-end gap-3 px-3 pb-2 pt-1.5 text-[11px] text-zinc-500">
-                    <button
-                      onClick={() => {
-                        setEditingId(n.id);
-                        setEditText(n.text);
-                      }}
-                      className="hover:text-zinc-300"
-                    >
-                      Bearbeiten
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (confirm('Notiz löschen?')) deleteNote(rid, n.id);
-                      }}
-                      className="hover:text-red-300"
-                    >
-                      Löschen
-                    </button>
-                  </div>
-                </>
-              )}
-            </li>
-          ))}
-        </ul>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+          <SortableContext items={list.map((n) => n.id)} strategy={verticalListSortingStrategy}>
+            <ul className="mt-4 space-y-2.5">
+              {list.map((n) => (
+                <SortableNote
+                  key={n.id}
+                  n={n}
+                  editing={editingId === n.id}
+                  editText={editText}
+                  setEditText={setEditText}
+                  onStartEdit={() => {
+                    setEditingId(n.id);
+                    setEditText(n.text);
+                  }}
+                  onCancelEdit={() => setEditingId(null)}
+                  onSaveEdit={saveEdit}
+                  onDelete={() => {
+                    if (confirm('Notiz löschen?')) deleteNote(rid, n.id);
+                  }}
+                />
+              ))}
+            </ul>
+          </SortableContext>
+        </DndContext>
       )}
     </section>
+  );
+}
+
+// Einzelne Notiz als sortierbarer Zettel (Drag am Griff ⠿).
+function SortableNote({
+  n,
+  editing,
+  editText,
+  setEditText,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+  onDelete,
+}: {
+  n: Note;
+  editing: boolean;
+  editText: string;
+  setEditText: (v: string) => void;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onSaveEdit: () => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: n.id });
+  const color = authorColor(n.author);
+  return (
+    <li
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, borderLeftColor: color, opacity: isDragging ? 0.85 : 1, zIndex: isDragging ? 20 : undefined, position: 'relative' }}
+      className="overflow-hidden rounded-lg border-l-[3px] bg-ink-850 ring-1 ring-white/5"
+    >
+      {editing ? (
+        <div className="p-3">
+          <textarea
+            autoFocus
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            rows={paperRows(editText)}
+            className="w-full resize-y rounded-lg border border-ink-700 bg-ink-800 px-3 py-2 text-sm text-zinc-100 focus:border-accent/60"
+          />
+          <div className="mt-2 flex justify-end gap-2">
+            <button onClick={onCancelEdit} className="rounded px-3 py-1 text-xs font-medium text-zinc-400 hover:bg-ink-700">
+              Abbrechen
+            </button>
+            <button onClick={onSaveEdit} disabled={!editText.trim()} className="rounded bg-accent px-3 py-1 text-xs font-bold text-ink-950 hover:bg-accent-soft disabled:opacity-40">
+              Speichern
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-baseline justify-between px-3 pt-2.5">
+            <span className="flex min-w-0 items-center gap-1.5">
+              <button
+                type="button"
+                {...attributes}
+                {...listeners}
+                aria-label="Notiz verschieben"
+                className="-ml-1 shrink-0 cursor-grab touch-none rounded p-0.5 text-zinc-600 hover:text-zinc-400 active:cursor-grabbing"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="9" cy="5" r="1.6" />
+                  <circle cx="15" cy="5" r="1.6" />
+                  <circle cx="9" cy="12" r="1.6" />
+                  <circle cx="15" cy="12" r="1.6" />
+                  <circle cx="9" cy="19" r="1.6" />
+                  <circle cx="15" cy="19" r="1.6" />
+                </svg>
+              </button>
+              <span className="truncate text-sm font-semibold" style={{ color }}>
+                {n.author}
+              </span>
+            </span>
+            <span className="shrink-0 text-xs text-zinc-500">{noteDate(n.at)}</span>
+          </div>
+          <p className="whitespace-pre-wrap px-3 pt-1 text-sm leading-relaxed text-zinc-200">{n.text}</p>
+          <div className="flex justify-end gap-3 px-3 pb-2 pt-1.5 text-[11px] text-zinc-500">
+            <button onClick={onStartEdit} className="hover:text-zinc-300">
+              Bearbeiten
+            </button>
+            <button onClick={onDelete} className="hover:text-red-300">
+              Löschen
+            </button>
+          </div>
+        </>
+      )}
+    </li>
   );
 }
 
