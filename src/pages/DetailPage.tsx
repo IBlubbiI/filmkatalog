@@ -403,7 +403,7 @@ function NotesPanel({ movie }: { movie: Movie }) {
                     <span className="text-sm font-semibold" style={{ color: authorColor(n.author) }}>{n.author}</span>
                     <span className="text-xs text-zinc-500">{noteDate(n.at)}</span>
                   </div>
-                  <p className="whitespace-pre-wrap px-3 pt-1 text-sm leading-relaxed" style={{ color: authorColor(n.author) }}>{n.text}</p>
+                  <p className="whitespace-pre-wrap px-3 pt-1 text-sm leading-relaxed text-zinc-200">{n.text}</p>
                   <div className="flex justify-end gap-3 px-3 pb-2 pt-1.5 text-[11px] text-zinc-500">
                     <button
                       onClick={() => {
