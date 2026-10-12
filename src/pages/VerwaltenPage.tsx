@@ -37,7 +37,7 @@ const GROUPS: { group: string; items: Field[] }[] = [
     items: [
       { k: 'title_de', l: 'Titel (DE)', t: 'text' },
       { k: 'title_original', l: 'Originaltitel', t: 'text' },
-      { k: 'year', l: 'Jahr', t: 'number' },
+      { k: 'year', l: 'Jahr', t: 'text', ph: 'z. B. 2008 oder 1925-1951' },
       { k: 'director', l: 'Regie', t: 'text' },
       { k: 'franchise', l: 'Reihe/Franchise', t: 'text' },
       { k: 'category', l: 'Kategorie', t: 'select', o: ['', 'Marvel', 'DC'] },
