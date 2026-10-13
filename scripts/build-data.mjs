@@ -454,6 +454,10 @@ async function maybeDownload(tmdbPath, fileName, size, force = false) {
   return rel;
 }
 
+// Wie viele Darsteller je Film gespeichert werden (auch Nebenrollen → vollständigere
+// Besetzung & Schauspieler-Filmografien). Erhöhen → Self-Heal frischt gecachte Filme nach.
+const CAST_LIMIT = 20;
+
 async function enrichFromTmdb(client, movie, tmdbId, isTv, score, source, posterOverride = null) {
   const getDetails = isTv ? client.tv.bind(client) : client.movie.bind(client);
   const getEn = isTv ? client.tvEn.bind(client) : client.movieEn.bind(client);
@@ -471,10 +475,10 @@ async function enrichFromTmdb(client, movie, tmdbId, isTv, score, source, poster
   // Fassung mit anderem Titelbild) -> immer neu laden, damit es ein altes ersetzt.
   const poster = await maybeDownload(posterOverride || det.poster_path, `${movie.id}.jpg`, 'w500', !!posterOverride);
   const backdrop = await maybeDownload(det.backdrop_path, `${movie.id}_bg.jpg`, 'w780');
-  // Darsteller (Top 20) – tiefer als nur die Hauptrollen, damit auch Nebenrollen
+  // Darsteller (Top CAST_LIMIT) – tiefer als nur die Hauptrollen, damit auch Nebenrollen
   // in „Besetzung" und in den Film-übergreifenden Schauspieler-Listen auftauchen.
   const cast = (det.credits?.cast || [])
-    .slice(0, 20)
+    .slice(0, CAST_LIMIT)
     .map((c) => ({ id: c.id, name: c.name, character: c.character || null, profile: c.profile_path || null }));
   // TMDB-Sammlung (nur Filme) – für die "Sammlung"-Ansicht mit Platzhaltern
   const collection = det.belongs_to_collection
@@ -493,6 +497,7 @@ async function enrichFromTmdb(client, movie, tmdbId, isTv, score, source, poster
     tmdbPoster: posterOverride || det.poster_path || null,
     tmdbBackdrop: det.backdrop_path || null,
     cast,
+    castN: CAST_LIMIT, // mit welcher Besetzungstiefe gecacht – für den Self-Heal bei Erhöhung
     collection,
     matchedTitle,
     matchedYear,
@@ -513,7 +518,7 @@ if (NO_TMDB || !TMDB_KEY) {
 } else {
   const client = makeTmdbClient(TMDB_KEY);
   log(`\n🎬 TMDB-Anreicherung aktiv (${client.isV4 ? 'v4-Token' : 'v3-Key'})${REFRESH ? ', --refresh' : ''} …`);
-  let done = 0, fromCache = 0, fetched = 0, failed = 0;
+  let done = 0, fromCache = 0, fetched = 0, failed = 0, castHealed = 0;
   for (const m of movies) {
     done++;
     const hasOverride = Object.prototype.hasOwnProperty.call(overrides, m.id);
@@ -547,6 +552,22 @@ if (NO_TMDB || !TMDB_KEY) {
         if (cached.tmdbBackdrop) await maybeDownload(cached.tmdbBackdrop, `${m.id}_bg.jpg`, 'w780');
       } catch (e) {
         warn(`${m.id} Bild nachladen: ${e.message}`);
+      }
+      // Self-Heal: wurde die Besetzungstiefe erhöht, die Besetzung einmalig nachladen
+      // (nur Detail-Abruf, ohne erneutes Matching) und im Cache aktualisieren.
+      if (cached.tmdbId && (cached.castN ?? 0) < CAST_LIMIT) {
+        try {
+          const isTv = (cached.type ?? (m.type === 'Serie' ? 'tv' : 'movie')) === 'tv';
+          const det = await (isTv ? client.tv(cached.tmdbId) : client.movie(cached.tmdbId));
+          cached.cast = (det.credits?.cast || [])
+            .slice(0, CAST_LIMIT)
+            .map((c) => ({ id: c.id, name: c.name, character: c.character || null, profile: c.profile_path || null }));
+          cached.castN = CAST_LIMIT;
+          cache[m.id] = cached;
+          castHealed++;
+        } catch (e) {
+          warn(`${m.id} Besetzung nachladen: ${e.message}`);
+        }
       }
       m.tmdb = {
         tmdbId: cached.tmdbId, rating: cached.rating, votes: cached.votes,
@@ -586,7 +607,7 @@ if (NO_TMDB || !TMDB_KEY) {
     if (done % 25 === 0) log(`   … ${done}/${movies.length}`);
   }
   fs.writeFileSync(CACHE_PATH, JSON.stringify(cache, null, 2));
-  log(`✓ TMDB fertig: ${fetched} neu geholt, ${fromCache} aus Cache, ${failed} ohne Treffer.`);
+  log(`✓ TMDB fertig: ${fetched} neu geholt, ${fromCache} aus Cache, ${failed} ohne Treffer${castHealed ? `, ${castHealed} Besetzung nachgeladen` : ''}.`);
 
   // Sammlung-Ansicht: Filmreihen + Ableger + Disc-Release-Status (eigenes Modul,
   // damit derselbe Schritt auch in der CI aus public/movies.json laufen kann)
