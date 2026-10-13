@@ -471,9 +471,10 @@ async function enrichFromTmdb(client, movie, tmdbId, isTv, score, source, poster
   // Fassung mit anderem Titelbild) -> immer neu laden, damit es ein altes ersetzt.
   const poster = await maybeDownload(posterOverride || det.poster_path, `${movie.id}.jpg`, 'w500', !!posterOverride);
   const backdrop = await maybeDownload(det.backdrop_path, `${movie.id}_bg.jpg`, 'w780');
-  // Wichtigste Darsteller (Top 8)
+  // Darsteller (Top 20) – tiefer als nur die Hauptrollen, damit auch Nebenrollen
+  // in „Besetzung" und in den Film-übergreifenden Schauspieler-Listen auftauchen.
   const cast = (det.credits?.cast || [])
-    .slice(0, 8)
+    .slice(0, 20)
     .map((c) => ({ id: c.id, name: c.name, character: c.character || null, profile: c.profile_path || null }));
   // TMDB-Sammlung (nur Filme) – für die "Sammlung"-Ansicht mit Platzhaltern
   const collection = det.belongs_to_collection

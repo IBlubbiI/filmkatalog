@@ -6,6 +6,9 @@ import {
   facetCounts,
   matches,
   ratingValue,
+  hasDtsX,
+  isOvOnly,
+  hasDeSubs,
   type FilterState,
   type FskValue,
   type SeenValue,
@@ -132,6 +135,9 @@ export function FilterSheet({ open, onClose, movies, state, setState }: Props) {
   const nHdr = countExcept('hdr', (m) => m.hasHdr);
   const nDv = countExcept('hdr', (m) => m.hasDolbyVision);
   const nAtmos = countExcept('atmos', (m) => m.atmos === 'Ja');
+  const nDtsx = countExcept('dtsx', hasDtsX);
+  const nOv = countExcept('ov', isOvOnly);
+  const nSubs = countExcept('deSubs', hasDeSubs);
   const nEc = countExcept('extendedCut', (m) => m.extendedCut);
 
   // Wie viele Filme hat der jeweilige Autor (bzw. „Gesamt") bewertet – unter den übrigen Filtern.
@@ -216,6 +222,7 @@ export function FilterSheet({ open, onClose, movies, state, setState }: Props) {
               <Chip label="HDR" count={nHdr} active={state.hdr === 'has'} onClick={() => setState((s) => ({ ...s, hdr: s.hdr === 'has' ? 'any' : 'has' }))} />
               <Chip label="Dolby Vision" count={nDv} active={state.hdr === 'dv'} onClick={() => setState((s) => ({ ...s, hdr: s.hdr === 'dv' ? 'any' : 'dv' }))} />
               <Chip label="Dolby Atmos" count={nAtmos} active={state.atmosOnly} onClick={() => setState((s) => ({ ...s, atmosOnly: !s.atmosOnly }))} />
+              <Chip label="DTS:X" count={nDtsx} active={state.dtsxOnly} onClick={() => setState((s) => ({ ...s, dtsxOnly: !s.dtsxOnly }))} />
               <Chip label="Extended Cut" count={nEc} active={state.extendedCutOnly} onClick={() => setState((s) => ({ ...s, extendedCutOnly: !s.extendedCutOnly }))} />
             </div>
           </Section>
@@ -282,6 +289,13 @@ export function FilterSheet({ open, onClose, movies, state, setState }: Props) {
                   onClick={() => toggleArr('fsk', f)}
                 />
               ))}
+            </div>
+          </Section>
+
+          <Section title="Sprache & Untertitel">
+            <div className="flex flex-wrap gap-2">
+              <Chip label="Nur Originalfassung" count={nOv} active={state.ovOnly} onClick={() => setState((s) => ({ ...s, ovOnly: !s.ovOnly }))} />
+              <Chip label="Deutsche Untertitel" count={nSubs} active={state.deSubsOnly} onClick={() => setState((s) => ({ ...s, deSubsOnly: !s.deSubsOnly }))} />
             </div>
           </Section>
 

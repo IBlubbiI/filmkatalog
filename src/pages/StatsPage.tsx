@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useData } from '../lib/data';
 import { useUserData } from '../lib/userData';
 import { useDriveSync } from '../lib/driveSync';
@@ -239,6 +239,7 @@ function PersonalStats() {
     const dist = new Map<number, number>(); // gerundete Note 1–10 → Anzahl
     const topRated: { id: string; title: string; value: string }[] = [];
     const rewatched: { id: string; title: string; value: string }[] = [];
+    const disagree: { id: string; title: string; value: string; sp: number }[] = []; // größte Bewertungs-Differenz
 
     for (const [id, e] of Object.entries(userData)) {
       const movie = data.byId.get(id);
@@ -271,8 +272,20 @@ function PersonalStats() {
         dist.set(bucket, (dist.get(bucket) ?? 0) + 1);
         if (movie) topRated.push({ id, title: movie.title, value: val.toFixed(1) });
       }
-      // Autor-Durchschnitte nur in der „Alle"-Ansicht
-      if (!person) for (const [a, r] of Object.entries(e.ratings ?? {})) if (r.value != null) (byAuthor[a] ??= []).push(r.value);
+      // Autor-Durchschnitte & „uneinig" nur in der „Alle"-Ansicht
+      if (!person) {
+        const vals: number[] = [];
+        for (const [a, r] of Object.entries(e.ratings ?? {})) {
+          if (r.value != null) {
+            (byAuthor[a] ??= []).push(r.value);
+            vals.push(r.value);
+          }
+        }
+        if (vals.length >= 2 && movie) {
+          const sp = Math.max(...vals) - Math.min(...vals);
+          if (sp > 0) disagree.push({ id, title: movie.title, value: `Δ ${sp.toFixed(1)}`, sp });
+        }
+      }
     }
 
     const avg = ownRatings.length ? ownRatings.reduce((a, b) => a + b, 0) / ownRatings.length : null;
@@ -286,8 +299,10 @@ function PersonalStats() {
 
     topRated.sort((a, b) => Number(b.value) - Number(a.value));
     rewatched.sort((a, b) => Number(b.value) - Number(a.value));
+    disagree.sort((a, b) => b.sp - a.sp);
 
     return {
+      disagree: disagree.slice(0, 6).map(({ id, title, value }) => ({ id, title, value })),
       seenTotal,
       lastMonth,
       lastYear,
@@ -370,6 +385,7 @@ function PersonalStats() {
 
           <RankList title="Top-Filme" rows={p.topRated} onPick={(id) => navigate(`/film/${id}`)} />
           <RankList title="Am häufigsten gesehen" rows={p.rewatched} onPick={(id) => navigate(`/film/${id}`)} suffix="×" />
+          {!person && <RankList title="Wo ihr euch uneinig seid" rows={p.disagree} onPick={(id) => navigate(`/film/${id}`)} />}
 
           <p className="mt-3 text-[11px] leading-relaxed text-zinc-600">
             „Letzter Monat/Jahr" zählt, wann ein Film als gesehen markiert wurde. Für ältere Einträge ohne Datum gilt der
@@ -377,6 +393,210 @@ function PersonalStats() {
           </p>
         </>
       )}
+    </section>
+  );
+}
+
+// Daten-Qualitäts-Prüfungen (je Titel, auf Basis der gebauten Daten).
+const DATA_CHECKS: { key: string; label: string; test: (m: Movie) => boolean }[] = [
+  { key: 'tmdb', label: 'Kein TMDB-Treffer', test: (m) => !m.tmdb },
+  { key: 'poster', label: 'Kein Poster', test: (m) => !m.posterUrl && !m.tmdb?.poster },
+  { key: 'year', label: 'Kein Jahr', test: (m) => m.year == null },
+  { key: 'fsk', label: 'Keine FSK', test: (m) => m.fsk == null },
+  { key: 'genre', label: 'Kein Hauptgenre', test: (m) => !m.mainGenre },
+  { key: 'runtime', label: 'Keine Laufzeit', test: (m) => m.runtime == null },
+];
+
+/** Daten-Check: Titel mit fehlenden/unvollständigen Angaben – zum schnellen Nachpflegen. */
+function DataQuality() {
+  const data = useData();
+  const [open, setOpen] = useState<string | null>(null);
+
+  const results = useMemo(() => {
+    const primaries = [...data.groups.values()].map((g) => g[0]).filter(Boolean);
+    return DATA_CHECKS.map((c) => ({ ...c, films: primaries.filter(c.test).sort((a, b) => a.title.localeCompare(b.title, 'de')) })).filter((c) => c.films.length > 0);
+  }, [data.groups]);
+
+  if (!results.length) {
+    return (
+      <section className="mt-6">
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-accent/80">Daten-Check</h2>
+        <p className="rounded-xl bg-ink-800/60 p-4 text-xs text-zinc-500 ring-1 ring-white/5">Alles vollständig – keine fehlenden Angaben gefunden. 🎉</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="mt-6">
+      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-accent/80">Daten-Check</h2>
+      <div className="space-y-1.5">
+        {results.map((c) => (
+          <div key={c.key} className="overflow-hidden rounded-lg bg-ink-800/60 ring-1 ring-white/5">
+            <button onClick={() => setOpen((o) => (o === c.key ? null : c.key))} className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-ink-800">
+              <span className="text-sm text-zinc-200">
+                {open === c.key ? '▾' : '▸'} {c.label}
+              </span>
+              <span className="shrink-0 rounded-full bg-ink-700 px-2 py-0.5 text-xs font-semibold tabular-nums text-zinc-300">{c.films.length}</span>
+            </button>
+            {open === c.key && (
+              <div className="border-t border-ink-700/70 px-3 py-2">
+                <div className="flex flex-wrap gap-x-3 gap-y-1">
+                  {c.films.map((m) => (
+                    <Link key={m.id} to={`/film/${m.id}`} className="truncate text-xs text-accent-soft/90 hover:underline">
+                      {m.title}
+                      {m.year ? ` (${m.year})` : m.yearRaw ? ` (${m.yearRaw})` : ''}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+
+/** Jahresrückblick: was in einem Kalenderjahr gesehen wurde (pro Person oder Haushalt). */
+function JahresRueckblick() {
+  const data = useData();
+  const { data: userData } = useUserData();
+  const navigate = useNavigate();
+
+  // Jahre, in denen überhaupt etwas als gesehen markiert wurde.
+  const years = useMemo(() => {
+    const s = new Set<number>();
+    for (const e of Object.values(userData)) {
+      for (const sb of Object.values(e.seenBy ?? {})) if ((sb.count ?? 0) > 0 && sb.at) s.add(new Date(sb.at).getFullYear());
+      if (e.seen && e.seenAt) s.add(new Date(e.seenAt).getFullYear());
+    }
+    return [...s].sort((a, b) => b - a);
+  }, [userData]);
+
+  const people = useMemo(() => {
+    const set = new Set<string>(NOTE_AUTHORS);
+    for (const e of Object.values(userData)) for (const a of Object.keys(e.seenBy ?? {})) set.add(a);
+    return [...set];
+  }, [userData]);
+
+  const [year, setYear] = useState<number>(() => new Date().getFullYear());
+  const [person, setPerson] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(NOTE_AUTHOR_KEY) || NOTE_AUTHORS[0];
+    } catch {
+      return NOTE_AUTHORS[0];
+    }
+  });
+  const activeYear = years.includes(year) ? year : years[0];
+
+  const r = useMemo(() => {
+    const months = new Array(12).fill(0);
+    const genre = new Map<string, number>();
+    let minutes = 0;
+    const films: { id: string; title: string; value: string }[] = [];
+    for (const [id, e] of Object.entries(userData)) {
+      let when = 0;
+      if (person) {
+        const sb = e.seenBy?.[person];
+        if (!sb || (sb.count ?? 0) <= 0) continue;
+        when = sb.at;
+      } else {
+        if (!e.seen || !e.seenAt) continue;
+        when = e.seenAt;
+      }
+      const d = new Date(when);
+      if (d.getFullYear() !== activeYear) continue;
+      const movie = data.byId.get(id);
+      months[d.getMonth()]++;
+      if (movie?.runtime) minutes += movie.runtime;
+      if (movie?.mainGenre) genre.set(movie.mainGenre, (genre.get(movie.mainGenre) ?? 0) + 1);
+      const val = person ? e.ratings?.[person]?.value ?? null : e.rating ?? null;
+      if (movie) films.push({ id, title: movie.title, value: val != null ? val.toFixed(1) : '–' });
+    }
+    const count = months.reduce((a, b) => a + b, 0);
+    const bestMonthIdx = months.reduce((best, n, i) => (n > months[best] ? i : best), 0);
+    const topGenre = [...genre.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '–';
+    films.sort((a, b) => (Number(b.value) || -1) - (Number(a.value) || -1));
+    return { count, hours: Math.round(minutes / 60), bestMonth: count ? MONTHS[bestMonthIdx] : '–', topGenre, films: films.slice(0, 8) };
+  }, [userData, data.byId, person, activeYear]);
+
+  if (!years.length) return null; // noch nichts mit Datum erfasst
+
+  return (
+    <section className="mt-8">
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-accent/80">Jahresrückblick</h2>
+      <div className="mb-2 flex flex-wrap gap-1.5">
+        {years.map((y) => (
+          <button
+            key={y}
+            onClick={() => setYear(y)}
+            className={`rounded-full border px-3 py-1 text-xs font-medium ${y === activeYear ? 'border-accent bg-accent/15 text-accent-soft' : 'border-ink-600 text-zinc-400 hover:text-zinc-200'}`}
+          >
+            {y}
+          </button>
+        ))}
+      </div>
+      <div className="mb-3 flex flex-wrap gap-1.5">
+        {[null, ...people].map((a) => {
+          const active = person === a;
+          const c = a ? authorColor(a) : undefined;
+          return (
+            <button
+              key={a ?? 'alle'}
+              onClick={() => setPerson(a)}
+              className={`rounded-full border px-3 py-1 text-xs font-medium ${active ? (c ? 'bg-ink-800' : 'border-accent bg-accent/15 text-accent-soft') : 'border-ink-600 text-zinc-400 hover:text-zinc-200'}`}
+              style={active && c ? { color: c, borderColor: c } : undefined}
+            >
+              {a ?? 'Alle'}
+            </button>
+          );
+        })}
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat value={String(r.count)} label={`Filme ${activeYear}`} />
+        <Stat value={`${r.hours} h`} label="Laufzeit" />
+        <Stat value={r.bestMonth} label="bester Monat" small />
+        <Stat value={r.topGenre} label="Top-Genre" small />
+      </div>
+      <RankList title={`Deine Filme ${activeYear}`} rows={r.films} onPick={(id) => navigate(`/film/${id}`)} />
+    </section>
+  );
+}
+
+/** Übersicht aller aktuell verliehenen Filme (wer hat was) mit „zurück"-Aktion. */
+function LentOverview() {
+  const data = useData();
+  const { data: userData, returnLent } = useUserData();
+  const rows = useMemo(
+    () =>
+      Object.entries(userData)
+        .filter(([, e]) => e.lentTo?.to)
+        .map(([id, e]) => ({ id, to: e.lentTo!.to as string, at: e.lentTo!.at, movie: data.byId.get(id) }))
+        .filter((r) => r.movie)
+        .sort((a, b) => b.at - a.at),
+    [userData, data.byId],
+  );
+  if (!rows.length) return null;
+  return (
+    <section className="mt-6">
+      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-accent/80">Verliehen</h2>
+      <div className="space-y-1">
+        {rows.map((r) => (
+          <div key={r.id} className="flex items-center gap-3 rounded-lg bg-ink-800/60 px-3 py-2 ring-1 ring-white/5">
+            <Link to={`/film/${r.id}`} className="min-w-0 flex-1">
+              <p className="truncate text-sm text-zinc-200">{r.movie!.title}</p>
+              <p className="truncate text-xs text-zinc-500">
+                an <span className="text-amber-300">{r.to}</span> · seit {new Date(r.at).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' })}
+              </p>
+            </Link>
+            <button onClick={() => returnLent(r.id)} className="shrink-0 rounded-lg bg-ink-700 px-2.5 py-1.5 text-xs text-zinc-200 hover:bg-ink-600">
+              zurück
+            </button>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
@@ -535,11 +755,17 @@ export function StatsPage() {
 
       <PersonalStats />
 
+      <JahresRueckblick />
+
       <h2 className="mt-8 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-600">Sammlung</h2>
       <BarList title="Nach Discformat" rows={stats.byFormat} />
       <BarList title="Nach Hauptgenre (Top 14)" rows={stats.byGenre} />
       <BarList title="Nach Jahrzehnt" rows={stats.byDecade} />
       <BarList title="Nach FSK" rows={stats.byFsk} />
+
+      <LentOverview />
+
+      <DataQuality />
 
       <MyDataSection />
     </div>

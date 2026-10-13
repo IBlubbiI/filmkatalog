@@ -288,20 +288,28 @@ type Mode = 'all' | 'owned' | 'missing';
 const MODES: { key: Mode; label: string }[] = [
   { key: 'all', label: 'Alle' },
   { key: 'owned', label: 'Im Besitz' },
-  { key: 'missing', label: 'Nicht im Besitz' },
+  { key: 'missing', label: 'Kaufliste' },
 ];
+type BuySort = 'reihe' | 'jahr' | 'titel';
 
 // Scroll-Position über das Aus-/Einhängen der Seite hinweg merken (pro Sitzung).
 let savedScroll = 0;
 
 // Ansichtszustand (Modus, Toggle, Suche) über Seitenwechsel hinweg merken.
 const VIEW_KEY = 'filmkatalog.sammlung.v1';
-function loadView(): { mode: Mode; showUpcoming: boolean; q: string } {
+function loadView(): { mode: Mode; showUpcoming: boolean; q: string; buyList: boolean; buySort: BuySort } {
   try {
     const p = JSON.parse(localStorage.getItem(VIEW_KEY) || '{}');
-    return { mode: MODES.some((m) => m.key === p.mode) ? p.mode : 'all', showUpcoming: !!p.showUpcoming, q: typeof p.q === 'string' ? p.q : '' };
+    const buySort: BuySort = ['reihe', 'jahr', 'titel'].includes(p.buySort) ? p.buySort : 'reihe';
+    return {
+      mode: MODES.some((m) => m.key === p.mode) ? p.mode : 'all',
+      showUpcoming: !!p.showUpcoming,
+      q: typeof p.q === 'string' ? p.q : '',
+      buyList: p.buyList !== false, // Default: kompakte Liste
+      buySort,
+    };
   } catch {
-    return { mode: 'all', showUpcoming: false, q: '' };
+    return { mode: 'all', showUpcoming: false, q: '', buyList: true, buySort: 'reihe' };
   }
 }
 
@@ -313,14 +321,16 @@ export function SammlungPage() {
   const [mode, setMode] = useState<Mode>(init.mode);
   const [showUpcoming, setShowUpcoming] = useState(init.showUpcoming);
   const [query, setQuery] = useState(init.q);
+  const [buyList, setBuyList] = useState(init.buyList); // Kaufliste als kompakte Liste statt Raster
+  const [buySort, setBuySort] = useState<BuySort>(init.buySort);
 
   useEffect(() => {
     try {
-      localStorage.setItem(VIEW_KEY, JSON.stringify({ mode, showUpcoming, q: query }));
+      localStorage.setItem(VIEW_KEY, JSON.stringify({ mode, showUpcoming, q: query, buyList, buySort }));
     } catch {
       /* localStorage nicht verfügbar → nur pro Sitzung */
     }
-  }, [mode, showUpcoming, query]);
+  }, [mode, showUpcoming, query, buyList, buySort]);
 
   useLayoutEffect(() => {
     if (savedScroll) window.scrollTo(0, savedScroll);
@@ -367,6 +377,30 @@ export function SammlungPage() {
     const all = s.groups.flatMap((g) => g.list);
     return { owned: all.filter((e) => e.status === 'owned').length, releasable: all.filter((e) => e.status !== 'upcoming').length };
   };
+
+  // Kaufliste als flache, sortierbare Gesamtliste: alle nicht besessenen Teile (über alle Reihen, entdoppelt).
+  const buyRows = useMemo(() => {
+    const seen = new Set<string>();
+    const out: { e: Entry; reihe: string }[] = [];
+    for (const s of sections)
+      for (const g of s.groups)
+        for (const e of g.list) {
+          if (e.status === 'owned') continue;
+          if (e.status === 'upcoming' && !showUpcoming) continue;
+          if (seen.has(e.key)) continue;
+          seen.add(e.key);
+          out.push({ e, reihe: s.name });
+        }
+    const filtered = q ? out.filter((x) => x.e.title.toLowerCase().includes(q) || x.reihe.toLowerCase().includes(q)) : out;
+    const yr = (e: Entry) => Number(e.year) || 9999;
+    filtered.sort((a, b) => {
+      if (buySort === 'jahr') return yr(a.e) - yr(b.e);
+      if (buySort === 'titel') return a.e.title.localeCompare(b.e.title, 'de');
+      return a.reihe.localeCompare(b.reihe, 'de') || yr(a.e) - yr(b.e);
+    });
+    return filtered;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sections, showUpcoming, q, buySort]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16">
@@ -424,10 +458,64 @@ export function SammlungPage() {
           Ohne Disc-Release
         </button>
         </div>
+        {/* Kaufliste: Darstellung (Liste/Raster) + Sortierung */}
+        {mode === 'missing' && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <div className="flex rounded-lg border border-ink-700 bg-ink-800 p-0.5 text-xs">
+              <button onClick={() => setBuyList(true)} className={`rounded-md px-2.5 py-1 font-medium ${buyList ? 'bg-ink-700 text-accent-soft' : 'text-zinc-400'}`}>Liste</button>
+              <button onClick={() => setBuyList(false)} className={`rounded-md px-2.5 py-1 font-medium ${!buyList ? 'bg-ink-700 text-accent-soft' : 'text-zinc-400'}`}>Raster</button>
+            </div>
+            {buyList && (
+              <label className="flex items-center gap-1.5 text-xs text-zinc-500">
+                Sortieren
+                <select
+                  value={buySort}
+                  onChange={(e) => setBuySort(e.target.value as BuySort)}
+                  className="rounded-lg border border-ink-700 bg-ink-800 px-2 py-1 text-xs text-zinc-200 focus:border-accent/60"
+                >
+                  <option value="reihe">Reihe</option>
+                  <option value="jahr">Jahr</option>
+                  <option value="titel">Titel</option>
+                </select>
+              </label>
+            )}
+            <span className="ml-auto text-[11px] text-zinc-500">{buyRows.length} {buyRows.length === 1 ? 'Titel fehlt' : 'Titel fehlen'}</span>
+          </div>
+        )}
       </header>
 
       {data.loading ? (
         <p className="py-16 text-center text-zinc-500">Lädt…</p>
+      ) : mode === 'missing' && buyList ? (
+        buyRows.length === 0 ? (
+          <p className="py-16 text-center text-zinc-500">Dir fehlt nichts aus deinen Reihen. 🎉</p>
+        ) : (
+          <div className="mx-auto mt-4 max-w-2xl divide-y divide-ink-800/70">
+            {buyRows.map(({ e, reihe }) => (
+              <DiscoverLink key={e.key} e={e}>
+                <div className="flex items-center gap-3 py-2 hover:bg-ink-800/50">
+                  <div className="aspect-[2/3] w-9 shrink-0 overflow-hidden rounded ring-1 ring-white/5">
+                    {e.poster ? (
+                      <img src={`https://image.tmdb.org/t/p/w92${e.poster}`} alt="" loading="lazy" className="h-full w-full object-cover opacity-80" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-ink-850 text-[8px] text-zinc-600">?</div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm text-zinc-200">
+                      {e.title}
+                      {e.year && <span className="ml-1.5 text-xs text-zinc-500">{e.year}</span>}
+                    </p>
+                    <p className="truncate text-xs text-zinc-500">{reihe}</p>
+                  </div>
+                  {e.status === 'upcoming' && (
+                    <span className="shrink-0 rounded bg-ink-800 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-zinc-500 ring-1 ring-white/10">kein Release</span>
+                  )}
+                </div>
+              </DiscoverLink>
+            ))}
+          </div>
+        )
       ) : shown.length === 0 && standaloneShown.length === 0 ? (
         <p className="py-16 text-center text-zinc-500">Keine Titel gefunden.</p>
       ) : (

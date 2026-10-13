@@ -10,7 +10,7 @@ import { useUserData, type Note } from '../lib/userData';
 import { NOTE_AUTHORS, NOTE_AUTHOR_KEY, authorColor } from '../lib/authors';
 import { PosterImage } from '../components/PosterImage';
 import { backdropUrl, formatRuntime, ratingPercent, yearLabel, fskLabel } from '../lib/format';
-import { IconChevronLeft, IconStar, IconHome, IconCheck, IconClose } from '../components/Icons';
+import { IconChevronLeft, IconStar, IconHome, IconCheck, IconClose, IconShare, IconBookmark } from '../components/Icons';
 import type { Movie, CastMember } from '../types';
 
 function CastAvatar({ c }: { c: CastMember }) {
@@ -160,13 +160,14 @@ const RATING_LEGEND: { n: number; label: string; hint: string }[] = [
 
 function MyRatingPanel({ movie }: { movie: Movie }) {
   const data = useData();
-  const { entry, authorRatings, setAuthorRating, clearAuthorRating, authorSeen, toggleSeen, setAuthorWatchCount } = useUserData();
+  const { entry, authorRatings, setAuthorRating, clearAuthorRating, authorSeen, toggleSeen, setAuthorWatchCount, wishBy, toggleWish } = useUserData();
   const [showLegend, setShowLegend] = useState(false);
   // Bewertung gilt film-weit: immer am Gruppen-Primär speichern, egal welche Ausgabe offen ist
   const rid = (movie.groupId && data.groups.get(movie.groupId)?.[0]?.id) || movie.id;
   const e = entry(rid);
   const ratings = authorRatings(rid);
   const seenBy = authorSeen(rid);
+  const wishes = wishBy(rid);
 
   // Ausgewählter Autor (geteilt mit den Notizen, damit „wer bewertet/schreibt" konsistent ist).
   const [author, setAuthor] = useState<string>(() => {
@@ -195,6 +196,9 @@ function MyRatingPanel({ movie }: { movie: Movie }) {
   const myViews = seenBy[author]?.count ?? 0;
   const mySeen = myViews > 0;
   const seenList = [...new Set([...NOTE_AUTHORS, ...Object.keys(seenBy)])].filter((a) => (seenBy[a]?.count ?? 0) > 0);
+  // Merkliste „will sehen"
+  const myWish = !!wishes[author]?.want;
+  const wishList = [...new Set([...NOTE_AUTHORS, ...Object.keys(wishes)])].filter((a) => wishes[a]?.want);
 
   return (
     <section className="mt-5 rounded-xl bg-ink-800/60 p-4 ring-1 ring-white/5">
@@ -297,16 +301,29 @@ function MyRatingPanel({ movie }: { movie: Movie }) {
 
       {/* „Gesehen" pro Person – für den aktiven Autor (oben gewählt) */}
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <button
-          onClick={() => toggleSeen(rid, author)}
-          style={mySeen ? { color, borderColor: color } : undefined}
-          className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors ${
-            mySeen ? 'bg-ink-800' : 'border-ink-600 bg-ink-700 text-zinc-300 hover:bg-ink-600'
-          }`}
-        >
-          <IconCheck width={16} height={16} />
-          {mySeen ? `${author}: gesehen` : `Als gesehen markieren (${author})`}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => toggleSeen(rid, author)}
+            style={mySeen ? { color, borderColor: color } : undefined}
+            className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors ${
+              mySeen ? 'bg-ink-800' : 'border-ink-600 bg-ink-700 text-zinc-300 hover:bg-ink-600'
+            }`}
+          >
+            <IconCheck width={16} height={16} />
+            {mySeen ? `${author}: gesehen` : `Als gesehen markieren (${author})`}
+          </button>
+          <button
+            onClick={() => toggleWish(rid, author)}
+            style={myWish ? { color, borderColor: color } : undefined}
+            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors ${
+              myWish ? 'bg-ink-800' : 'border-ink-600 bg-ink-700 text-zinc-300 hover:bg-ink-600'
+            }`}
+            aria-label="Auf Merkliste"
+          >
+            <IconBookmark width={16} height={16} fill={myWish ? 'currentColor' : 'none'} />
+            {myWish ? 'Gemerkt' : 'Merken'}
+          </button>
+        </div>
         {mySeen && (
           <div className="flex items-center gap-2 text-sm text-zinc-300">
             <div className="flex items-center overflow-hidden rounded-lg border border-ink-600">
@@ -332,6 +349,19 @@ function MyRatingPanel({ movie }: { movie: Movie }) {
               <IconCheck width={12} height={12} />
               {a}
               {(seenBy[a]?.count ?? 0) > 1 && <span className="tabular-nums opacity-80">{seenBy[a]!.count}×</span>}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Übersicht: wer will den Film sehen (Merkliste) */}
+      {wishList.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+          <span className="text-zinc-500">Will sehen:</span>
+          {wishList.map((a) => (
+            <span key={a} className="inline-flex items-center gap-1 font-medium" style={{ color: authorColor(a) }}>
+              <IconBookmark width={11} height={11} fill="currentColor" />
+              {a}
             </span>
           ))}
         </div>
@@ -711,6 +741,64 @@ function MiniPoster({ m }: { m: Movie }) {
   );
 }
 
+/** Verleih-Tracker: an wen verliehen + „zurückbekommen" (app-verwaltet, gesynct). */
+function VerleihPanel({ movie }: { movie: Movie }) {
+  const data = useData();
+  const { lent, setLent, returnLent } = useUserData();
+  const rid = (movie.groupId && data.groups.get(movie.groupId)?.[0]?.id) || movie.id;
+  const cur = lent(rid);
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+
+  if (cur?.to) {
+    const date = new Date(cur.at).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' });
+    return (
+      <section className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+        <p className="text-sm text-zinc-200">
+          Verliehen an <span className="font-semibold text-amber-300">{cur.to}</span>
+          <span className="ml-1.5 text-xs text-zinc-500">seit {date}</span>
+        </p>
+        <button onClick={() => returnLent(rid)} className="rounded-lg bg-ink-700 px-3 py-1.5 text-sm text-zinc-200 hover:bg-ink-600">
+          Zurückbekommen
+        </button>
+      </section>
+    );
+  }
+  return (
+    <div className="mt-3">
+      {open ? (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setLent(rid, name);
+            setName('');
+            setOpen(false);
+          }}
+          className="flex items-center gap-2"
+        >
+          <input
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Verleihen an… (Name)"
+            className="min-w-0 flex-1 rounded-lg border border-ink-700 bg-ink-800 px-3 py-2 text-sm placeholder:text-zinc-600 focus:border-accent/60"
+          />
+          <button type="submit" disabled={!name.trim()} className="shrink-0 rounded-lg bg-accent px-3 py-2 text-sm font-bold text-ink-950 hover:bg-accent-soft disabled:opacity-40">
+            Verleihen
+          </button>
+          <button type="button" onClick={() => setOpen(false)} className="shrink-0 rounded-lg px-2 py-2 text-sm text-zinc-400 hover:bg-ink-700">
+            Abbrechen
+          </button>
+        </form>
+      ) : (
+        <button onClick={() => setOpen(true)} className="text-xs text-zinc-500 hover:text-zinc-300">
+          + Verleihen
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function DetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -718,6 +806,23 @@ export function DetailPage() {
   const { showFranchise, showDirector } = useCatalog();
   const movie = id ? data.byId.get(id) : undefined;
   const [castSel, setCastSel] = useState<CastMember | null>(null);
+  const [shareMsg, setShareMsg] = useState('');
+
+  const onShare = async () => {
+    if (!movie) return;
+    const url = window.location.href;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: movie.title, text: `${movie.title}${movie.year ? ` (${movie.year})` : ''}`, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        setShareMsg('Link kopiert');
+        setTimeout(() => setShareMsg(''), 2000);
+      }
+    } catch {
+      /* Teilen abgebrochen – ignorieren */
+    }
+  };
 
   const goFranchise = (name: string) => {
     showFranchise(name);
@@ -794,6 +899,14 @@ export function DetailPage() {
           <IconChevronLeft width={18} height={18} /> Zurück
         </button>
         <div className="absolute right-3 top-3 flex items-center gap-2">
+          {shareMsg && <span className="rounded-full bg-black/60 px-2 py-1 text-[11px] text-accent-soft backdrop-blur-sm">{shareMsg}</span>}
+          <button
+            onClick={onShare}
+            className="inline-flex items-center justify-center rounded-full bg-black/50 p-2 text-zinc-100 backdrop-blur-sm hover:bg-black/70"
+            aria-label="Film teilen"
+          >
+            <IconShare width={17} height={17} />
+          </button>
           <Link
             to={`/verwalten?edit=${movie.id}`}
             className="inline-flex items-center rounded-full bg-black/50 px-3 py-1.5 text-xs text-zinc-100 backdrop-blur-sm hover:bg-black/70"
@@ -862,6 +975,7 @@ export function DetailPage() {
 
         {/* Meine Bewertung / Gesehen (in der App gepflegt) */}
         <MyRatingPanel movie={movie} />
+        <VerleihPanel movie={movie} />
 
         {/* Genres */}
         {(movie.genres.length > 0 || movie.franchise) && (

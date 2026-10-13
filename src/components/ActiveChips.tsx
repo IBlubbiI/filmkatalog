@@ -24,6 +24,9 @@ function build(state: FilterState): Descriptor[] {
   if (state.hdr === 'has') d.push({ label: 'HDR', clear: (s) => ({ ...s, hdr: 'any' }) });
   if (state.hdr === 'dv') d.push({ label: 'Dolby Vision', clear: (s) => ({ ...s, hdr: 'any' }) });
   if (state.atmosOnly) d.push({ label: 'Atmos', clear: (s) => ({ ...s, atmosOnly: false }) });
+  if (state.dtsxOnly) d.push({ label: 'DTS:X', clear: (s) => ({ ...s, dtsxOnly: false }) });
+  if (state.ovOnly) d.push({ label: 'Originalfassung', clear: (s) => ({ ...s, ovOnly: false }) });
+  if (state.deSubsOnly) d.push({ label: 'DE-Untertitel', clear: (s) => ({ ...s, deSubsOnly: false }) });
   if (state.extendedCutOnly) d.push({ label: 'Extended Cut', clear: (s) => ({ ...s, extendedCutOnly: false }) });
   state.category.forEach((c) => d.push({ label: c, clear: rmFrom('category', c) }));
   state.mainGenre.forEach((g) => d.push({ label: g, clear: rmFrom('mainGenre', g) }));

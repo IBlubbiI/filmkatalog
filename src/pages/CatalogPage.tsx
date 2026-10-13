@@ -10,7 +10,8 @@ import { MovieCard, MovieRow } from '../components/MovieCard';
 import { FilterSheet } from '../components/FilterSheet';
 import { ActiveChips } from '../components/ActiveChips';
 import { RandomModal } from '../components/RandomModal';
-import { IconSearch, IconFilter, IconGrid, IconList, IconDice, IconClose } from '../components/Icons';
+import { ScanModal } from '../components/ScanModal';
+import { IconSearch, IconFilter, IconGrid, IconList, IconDice, IconClose, IconScan } from '../components/Icons';
 import { SectionNav } from '../components/SectionNav';
 
 /** Ausgaben desselben Films zu einer Karte zusammenfassen (Primär = beste Disc). */
@@ -32,6 +33,7 @@ export function CatalogPage() {
   const { filters, setFilters, sort, setSort, view, setView, search, setSearch } = useCatalog();
   const [filterOpen, setFilterOpen] = useState(false);
   const [randomOpen, setRandomOpen] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
 
   // App-eigene Bewertungen/Gesehen über die Excel-Werte legen (für Filter & Sortierung)
   const movies = useMemo(
@@ -165,10 +167,18 @@ export function CatalogPage() {
         >
           <IconDice />
         </button>
+        <button
+          onClick={() => setScanOpen(true)}
+          className="inline-flex items-center justify-center rounded-full bg-ink-750 px-4 py-3 text-zinc-100 shadow-lg shadow-black/40 ring-1 ring-white/10 hover:bg-ink-700"
+          aria-label="Barcode scannen"
+        >
+          <IconScan />
+        </button>
       </div>
 
       <FilterSheet open={filterOpen} onClose={() => setFilterOpen(false)} movies={movies} state={filters} setState={setFilters} />
       {randomOpen && <RandomModal movies={results} onClose={() => setRandomOpen(false)} />}
+      {scanOpen && <ScanModal onClose={() => setScanOpen(false)} />}
     </div>
   );
 }

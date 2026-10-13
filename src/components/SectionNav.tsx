@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom';
-import { IconHome, IconLayers, IconChart, IconDisc } from './Icons';
+import { IconHome, IconLayers, IconChart, IconDisc, IconBookmark } from './Icons';
 
-export type Section = 'katalog' | 'sammlung' | 'stats' | 'verwalten';
+export type Section = 'katalog' | 'sammlung' | 'watchlist' | 'stats' | 'verwalten';
 
 const SECTIONS: { key: Section; to: string; label: string; icon: typeof IconHome }[] = [
   { key: 'katalog', to: '/', label: 'Katalog', icon: IconHome },
   { key: 'sammlung', to: '/sammlung', label: 'Sammlung', icon: IconLayers },
+  { key: 'watchlist', to: '/watchlist', label: 'Merkliste', icon: IconBookmark },
   { key: 'stats', to: '/stats', label: 'Statistik', icon: IconChart },
   { key: 'verwalten', to: '/verwalten', label: 'Verwalten', icon: IconDisc },
 ];

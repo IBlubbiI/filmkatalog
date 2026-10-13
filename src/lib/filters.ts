@@ -24,6 +24,9 @@ export interface FilterState {
   decade: string[];
   runtimeMax: number | null;
   atmosOnly: boolean;
+  dtsxOnly: boolean; // Tonspur mit DTS:X
+  ovOnly: boolean; // keine deutsche Tonspur (nur Originalfassung)
+  deSubsOnly: boolean; // mit deutschen Untertiteln
   extendedCutOnly: boolean;
   seen: SeenValue[];
   ratingAuthor: string | null; // null = Gesamt-/Durchschnittswertung, sonst Autor (Thomas/Hannah/…)
@@ -51,12 +54,20 @@ export function emptyFilters(): FilterState {
     decade: [],
     runtimeMax: null,
     atmosOnly: false,
+    dtsxOnly: false,
+    ovOnly: false,
+    deSubsOnly: false,
     extendedCutOnly: false,
     seen: [],
     ratingAuthor: null,
     ratingMin: null,
   };
 }
+
+// Tonspur-/Untertitel-Prüfungen auf den (freitextlichen) Audio-/UT-Feldern.
+export const hasDtsX = (m: Movie) => /DTS:?X/i.test(`${m.audioOriginal ?? ''} ${m.audioGerman ?? ''}`);
+export const isOvOnly = (m: Movie) => !m.audioGerman || /^nein/i.test(m.audioGerman);
+export const hasDeSubs = (m: Movie) => /^ja/i.test(m.subtitlesDe ?? '');
 
 // Wertung eines Films aus Sicht des Filters: ein bestimmter Autor oder (null) die Gesamtwertung.
 export const ratingValue = (m: Movie, author: string | null): number | null =>
@@ -94,6 +105,9 @@ export const DIMS: Record<string, (m: Movie, s: FilterState) => boolean> = {
   decade: (m, s) => s.decade.length === 0 || (m.decades ?? (m.decade ? [m.decade] : [])).some((d) => s.decade.includes(d)),
   runtime: (m, s) => s.runtimeMax == null || (m.runtime != null && m.runtime <= s.runtimeMax),
   atmos: (m, s) => !s.atmosOnly || m.atmos === 'Ja',
+  dtsx: (m, s) => !s.dtsxOnly || hasDtsX(m),
+  ov: (m, s) => !s.ovOnly || isOvOnly(m),
+  deSubs: (m, s) => !s.deSubsOnly || hasDeSubs(m),
   extendedCut: (m, s) => !s.extendedCutOnly || m.extendedCut,
   seen: (m, s) => s.seen.length === 0 || s.seen.includes(seenOf(m)),
   rating: (m, s) => {
@@ -137,6 +151,9 @@ export function activeCount(s: FilterState): number {
   n += s.decade.length;
   n += s.runtimeMax != null ? 1 : 0;
   n += s.atmosOnly ? 1 : 0;
+  n += s.dtsxOnly ? 1 : 0;
+  n += s.ovOnly ? 1 : 0;
+  n += s.deSubsOnly ? 1 : 0;
   n += s.extendedCutOnly ? 1 : 0;
   n += s.seen.length;
   n += s.ratingMin != null ? 1 : 0;

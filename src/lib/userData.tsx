@@ -24,6 +24,12 @@ export interface AuthorSeen {
   at: number; // zuletzt gesehen (ms)
 }
 
+// „Will sehen"/Merkliste eines einzelnen Autors (Tombstone über want:false + at).
+export interface AuthorWish {
+  want: boolean; // true = auf der Merkliste
+  at: number;
+}
+
 // Vom Nutzer in der App gepflegte Daten (auf dem Gerät gespeichert).
 export interface UserEntry {
   seenBy?: Record<string, AuthorSeen>; // „gesehen" je Person (Thomas/Hannah/…) – Quelle der Wahrheit
@@ -33,6 +39,8 @@ export interface UserEntry {
   watchCount?: number; // Summe aller Ansichten (Haushalt)
   rating?: number | null; // Gesamt-/Durchschnittswertung (für Katalog-Filter & -Sortierung)
   ratings?: Record<string, AuthorRating>; // Bewertung je Autor (Thomas/Hannah/…)
+  wishBy?: Record<string, AuthorWish>; // „will sehen"/Merkliste je Person
+  lentTo?: { to: string | null; at: number }; // verliehen an (to=null → zurück); app-verwaltet & gesynct
   notes?: Note[]; // Gedanken/Kommentare zum Film (mit Autor)
   updatedAt?: number; // Zeitstempel (ms) für Merge der Skalar-Felder zwischen Geräten
 }
@@ -61,7 +69,9 @@ const withSeenAggregates = (e: UserEntry): UserEntry => {
   return { ...e, seen: anySeen(e.seenBy), watchCount: totalViews(e.seenBy), seenAt: lastSeenAt(e.seenBy) || undefined };
 };
 
-const hasData = (e: UserEntry) => !!e && (e.seen || e.rating != null || !!e.watchCount || activeNotes(e).length > 0 || hasAuthorRating(e) || anySeen(e.seenBy));
+const anyWish = (wb?: Record<string, AuthorWish>) => Object.values(wb ?? {}).some((w) => w.want);
+const hasData = (e: UserEntry) =>
+  !!e && (e.seen || e.rating != null || !!e.watchCount || activeNotes(e).length > 0 || hasAuthorRating(e) || anySeen(e.seenBy) || anyWish(e.wishBy) || !!e.lentTo?.to);
 const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
 const KEY = 'filmkatalog.userdata.v1';
@@ -76,6 +86,11 @@ interface Ctx {
   authorSeen: (id: string) => Record<string, AuthorSeen>; // „gesehen" je Person
   toggleSeen: (id: string, author: string) => void; // gesehen-Status einer Person umschalten
   setAuthorWatchCount: (id: string, author: string, n: number) => void; // „×-gesehen" einer Person setzen
+  wishBy: (id: string) => Record<string, AuthorWish>; // Merkliste je Person
+  toggleWish: (id: string, author: string) => void; // „will sehen" einer Person umschalten
+  lent: (id: string) => { to: string | null; at: number } | undefined; // Verleih-Status
+  setLent: (id: string, to: string) => void; // an jemanden verleihen
+  returnLent: (id: string) => void; // als zurück markieren
   notes: (id: string) => Note[]; // aktive Notizen in Anzeige-Reihenfolge
   addNote: (id: string, author: string, text: string) => void;
   editNote: (id: string, noteId: string, text: string, author?: string) => void;
@@ -159,6 +174,32 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
       const at = count > prev ? Date.now() : e.seenBy?.[author]?.at ?? Date.now();
       const seenBy = { ...(e.seenBy ?? {}), [author]: { count, at } };
       return { ...d, [id]: withSeenAggregates({ ...e, seenBy, updatedAt: Date.now() }) };
+    });
+  }, []);
+
+  // Merkliste „will sehen" je Person.
+  const wishBy = useCallback((id: string) => dataRef.current[id]?.wishBy ?? {}, []);
+  const toggleWish = useCallback((id: string, author: string) => {
+    setData((d) => {
+      const e = d[id] ?? {};
+      const want = !(e.wishBy?.[author]?.want);
+      const wb = { ...(e.wishBy ?? {}), [author]: { want, at: Date.now() } };
+      return { ...d, [id]: { ...e, wishBy: wb, updatedAt: Date.now() } };
+    });
+  }, []);
+
+  // Verleih (ein Status je Film; eigener Zeitstempel für den Merge).
+  const lent = useCallback((id: string) => dataRef.current[id]?.lentTo, []);
+  const setLent = useCallback((id: string, to: string) => {
+    const t = to.trim();
+    if (!t) return;
+    setData((d) => ({ ...d, [id]: { ...d[id], lentTo: { to: t, at: Date.now() }, updatedAt: Date.now() } }));
+  }, []);
+  const returnLent = useCallback((id: string) => {
+    setData((d) => {
+      const e = d[id];
+      if (!e?.lentTo?.to) return d;
+      return { ...d, [id]: { ...e, lentTo: { to: null, at: Date.now() }, updatedAt: Date.now() } };
     });
   }, []);
 
@@ -261,6 +302,14 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
       }
       return m;
     };
+    // Merkliste je Person zusammenführen (neuester at gewinnt).
+    const mergeWish = (a: Record<string, AuthorWish> = {}, b: Record<string, AuthorWish> = {}): Record<string, AuthorWish> => {
+      const m: Record<string, AuthorWish> = { ...a };
+      for (const [author, w] of Object.entries(b)) {
+        if (!m[author] || (w.at ?? 0) > (m[author].at ?? 0)) m[author] = w;
+      }
+      return m;
+    };
     for (const id of new Set([...Object.keys(local), ...Object.keys(remote || {})])) {
       const l = local[id];
       const r = (remote || {})[id];
@@ -285,6 +334,10 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
         out.seenBy = seenBy;
         out = withSeenAggregates(out); // seen/watchCount/seenAt aus zusammengeführten „gesehen"-Daten
       }
+      const wish = mergeWish(l.wishBy, r.wishBy);
+      if (Object.keys(wish).length) out.wishBy = wish;
+      // Verleih: neuerer Zeitstempel gewinnt (unabhängig von den übrigen Feldern).
+      if (l.lentTo || r.lentTo) out.lentTo = (r.lentTo?.at ?? 0) >= (l.lentTo?.at ?? 0) ? r.lentTo : l.lentTo;
       merged[id] = out;
     }
     setData(merged);
@@ -302,6 +355,11 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
       authorSeen,
       toggleSeen,
       setAuthorWatchCount,
+      wishBy,
+      toggleWish,
+      lent,
+      setLent,
+      returnLent,
       notes,
       addNote,
       editNote,
@@ -314,7 +372,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
       snapshot,
       mergeRemote,
     }),
-    [data, setRating, authorRatings, setAuthorRating, clearAuthorRating, authorSeen, toggleSeen, setAuthorWatchCount, notes, addNote, editNote, deleteNote, reorderNotes, exportJSON, importJSON, clearAll, snapshot, mergeRemote],
+    [data, setRating, authorRatings, setAuthorRating, clearAuthorRating, authorSeen, toggleSeen, setAuthorWatchCount, wishBy, toggleWish, lent, setLent, returnLent, notes, addNote, editNote, deleteNote, reorderNotes, exportJSON, importJSON, clearAll, snapshot, mergeRemote],
   );
 
   return <C.Provider value={value}>{children}</C.Provider>;
