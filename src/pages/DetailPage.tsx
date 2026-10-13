@@ -160,14 +160,13 @@ const RATING_LEGEND: { n: number; label: string; hint: string }[] = [
 
 function MyRatingPanel({ movie }: { movie: Movie }) {
   const data = useData();
-  const { entry, authorRatings, setAuthorRating, clearAuthorRating, setSeen, setWatchCount } = useUserData();
+  const { entry, authorRatings, setAuthorRating, clearAuthorRating, authorSeen, toggleSeen, setAuthorWatchCount } = useUserData();
   const [showLegend, setShowLegend] = useState(false);
   // Bewertung gilt film-weit: immer am Gruppen-Primär speichern, egal welche Ausgabe offen ist
   const rid = (movie.groupId && data.groups.get(movie.groupId)?.[0]?.id) || movie.id;
   const e = entry(rid);
   const ratings = authorRatings(rid);
-  const seen = e.seen ?? movie.seen ?? false;
-  const watchCount = e.watchCount ?? (seen ? 1 : 0);
+  const seenBy = authorSeen(rid);
 
   // Ausgewählter Autor (geteilt mit den Notizen, damit „wer bewertet/schreibt" konsistent ist).
   const [author, setAuthor] = useState<string>(() => {
@@ -191,7 +190,11 @@ function MyRatingPanel({ movie }: { movie: Movie }) {
   const agg = e.rating ?? movie.rating ?? null; // Durchschnitt aller Autoren (Katalog-Wertung)
   // Autoren mit aktiver Bewertung (feste Reihenfolge zuerst, dann weitere), für die Übersicht.
   const rated = [...new Set([...NOTE_AUTHORS, ...Object.keys(ratings)])].filter((a) => ratings[a]?.value != null);
-  const authorChips = [...new Set([...NOTE_AUTHORS, ...Object.keys(ratings)])];
+  const authorChips = [...new Set([...NOTE_AUTHORS, ...Object.keys(ratings), ...Object.keys(seenBy)])];
+  // „Gesehen" des aktiven Autors + Übersicht, wer den Film gesehen hat.
+  const myViews = seenBy[author]?.count ?? 0;
+  const mySeen = myViews > 0;
+  const seenList = [...new Set([...NOTE_AUTHORS, ...Object.keys(seenBy)])].filter((a) => (seenBy[a]?.count ?? 0) > 0);
 
   return (
     <section className="mt-5 rounded-xl bg-ink-800/60 p-4 ring-1 ring-white/5">
@@ -292,24 +295,26 @@ function MyRatingPanel({ movie }: { movie: Movie }) {
         )}
       </div>
 
+      {/* „Gesehen" pro Person – für den aktiven Autor (oben gewählt) */}
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <button
-          onClick={() => setSeen(rid, !seen)}
-          className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
-            seen ? 'bg-accent/15 text-accent-soft ring-1 ring-accent/40' : 'bg-ink-700 text-zinc-300 hover:bg-ink-600'
+          onClick={() => toggleSeen(rid, author)}
+          style={mySeen ? { color, borderColor: color } : undefined}
+          className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors ${
+            mySeen ? 'bg-ink-800' : 'border-ink-600 bg-ink-700 text-zinc-300 hover:bg-ink-600'
           }`}
         >
           <IconCheck width={16} height={16} />
-          {seen ? 'Gesehen' : 'Als gesehen markieren'}
+          {mySeen ? `${author}: gesehen` : `Als gesehen markieren (${author})`}
         </button>
-        {seen && (
+        {mySeen && (
           <div className="flex items-center gap-2 text-sm text-zinc-300">
             <div className="flex items-center overflow-hidden rounded-lg border border-ink-600">
-              <button onClick={() => setWatchCount(rid, watchCount - 1)} className="px-3 py-1.5 text-lg leading-none hover:bg-ink-700" aria-label="weniger">
+              <button onClick={() => setAuthorWatchCount(rid, author, myViews - 1)} className="px-3 py-1.5 text-lg leading-none hover:bg-ink-700" aria-label="weniger">
                 −
               </button>
-              <span className="min-w-[3.5rem] px-2 text-center tabular-nums">{watchCount}× </span>
-              <button onClick={() => setWatchCount(rid, watchCount + 1)} className="px-3 py-1.5 text-lg leading-none hover:bg-ink-700" aria-label="mehr">
+              <span className="min-w-[3.5rem] px-2 text-center tabular-nums">{myViews}× </span>
+              <button onClick={() => setAuthorWatchCount(rid, author, myViews + 1)} className="px-3 py-1.5 text-lg leading-none hover:bg-ink-700" aria-label="mehr">
                 +
               </button>
             </div>
@@ -317,6 +322,20 @@ function MyRatingPanel({ movie }: { movie: Movie }) {
           </div>
         )}
       </div>
+
+      {/* Übersicht: wer hat den Film gesehen (jeweils in seiner Farbe, mit ×-Anzahl) */}
+      {seenList.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+          <span className="text-zinc-500">Gesehen von:</span>
+          {seenList.map((a) => (
+            <span key={a} className="inline-flex items-center gap-1 font-medium" style={{ color: authorColor(a) }}>
+              <IconCheck width={12} height={12} />
+              {a}
+              {(seenBy[a]?.count ?? 0) > 1 && <span className="tabular-nums opacity-80">{seenBy[a]!.count}×</span>}
+            </span>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
@@ -348,6 +367,9 @@ const NOTE_COLORS: { c: string; label: string }[] = [
 // Kleiner WYSIWYG-Editor (wie in Word): Text markieren, Button klicken.
 function RichNoteEditor({ initialHtml, onChange, placeholder, minHeight = 80 }: { initialHtml: string; onChange: (html: string) => void; placeholder?: string; minHeight?: number }) {
   const ref = useRef<HTMLDivElement>(null);
+  // Formatierungsleiste erst zeigen, wenn man ins Textfeld klickt (Fokus). Die Toolbar-
+  // Buttons verhindern per onPointerDown den Fokusverlust, blenden sie also nicht aus.
+  const [focused, setFocused] = useState(false);
   useEffect(() => {
     if (ref.current) ref.current.innerHTML = initialHtml || '';
     // nur beim Mount setzen, sonst springt der Cursor
@@ -372,11 +394,14 @@ function RichNoteEditor({ initialHtml, onChange, placeholder, minHeight = 80 }: 
         contentEditable
         suppressContentEditableWarning
         onInput={sync}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         data-placeholder={placeholder}
         className="note-editor note-content w-full resize-y overflow-auto px-3 py-2 text-sm leading-relaxed text-zinc-100"
         style={{ minHeight }}
       />
-      {/* Formatierungsleiste UNTER dem Textfeld */}
+      {/* Formatierungsleiste UNTER dem Textfeld – erst sichtbar, wenn das Feld fokussiert ist */}
+      {focused && (
       <div className="flex flex-wrap items-center gap-0.5 border-t border-ink-700 px-1.5 py-1">
         <button type="button" title="Fett" onPointerDown={(e) => e.preventDefault()} onClick={() => run('bold')} className={btn}>
           <span className="font-bold">F</span>
@@ -428,6 +453,7 @@ function RichNoteEditor({ initialHtml, onChange, placeholder, minHeight = 80 }: 
           ⌫
         </button>
       </div>
+      )}
     </div>
   );
 }

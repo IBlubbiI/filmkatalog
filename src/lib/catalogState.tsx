@@ -24,6 +24,8 @@ interface CatalogCtx {
   showDirector: (name: string) => void;
   /** Von der Detailseite: Reihe chronologisch anzeigen. */
   showFranchise: (name: string) => void;
+  /** Katalog mit genau diesem Filter(-Teil) zeigen (Rest zurückgesetzt). */
+  showFilter: (partial: Partial<FilterState>) => void;
 }
 
 const Ctx = createContext<CatalogCtx | null>(null);
@@ -50,9 +52,13 @@ export function CatalogStateProvider({ children }: { children: ReactNode }) {
     setFilters({ ...emptyFilters(), franchise: name });
     setSort('yearAsc'); // Reihe chronologisch
   };
+  const showFilter = (partial: Partial<FilterState>) => {
+    setSearch('');
+    setFilters({ ...emptyFilters(), ...partial });
+  };
 
   return (
-    <Ctx.Provider value={{ filters, setFilters, sort, setSort, view, setView, search, setSearch, showDirector, showFranchise }}>
+    <Ctx.Provider value={{ filters, setFilters, sort, setSort, view, setView, search, setSearch, showDirector, showFranchise, showFilter }}>
       {children}
     </Ctx.Provider>
   );

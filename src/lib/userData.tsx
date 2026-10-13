@@ -18,12 +18,21 @@ export interface AuthorRating {
   at: number;
 }
 
+// „Gesehen" eines einzelnen Autors: wie oft (count>=1) und wann zuletzt (at).
+export interface AuthorSeen {
+  count: number; // 0 = (nicht mehr) gesehen, >=1 = so oft gesehen
+  at: number; // zuletzt gesehen (ms)
+}
+
 // Vom Nutzer in der App gepflegte Daten (auf dem Gerät gespeichert).
 export interface UserEntry {
-  seen?: boolean;
+  seenBy?: Record<string, AuthorSeen>; // „gesehen" je Person (Thomas/Hannah/…) – Quelle der Wahrheit
+  // Aggregat-Felder (aus seenBy abgeleitet) – für Katalog-Badge/-Filter/-Sortierung & Alt-Daten:
+  seen?: boolean; // hat irgendjemand gesehen?
+  seenAt?: number; // zuletzt von irgendjemandem gesehen (ms)
+  watchCount?: number; // Summe aller Ansichten (Haushalt)
   rating?: number | null; // Gesamt-/Durchschnittswertung (für Katalog-Filter & -Sortierung)
   ratings?: Record<string, AuthorRating>; // Bewertung je Autor (Thomas/Hannah/…)
-  watchCount?: number; // wie oft gesehen (>=1)
   notes?: Note[]; // Gedanken/Kommentare zum Film (mit Autor)
   updatedAt?: number; // Zeitstempel (ms) für Merge der Skalar-Felder zwischen Geräten
 }
@@ -38,7 +47,21 @@ const avgRating = (ratings?: Record<string, AuthorRating>): number | null => {
   return vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null;
 };
 const hasAuthorRating = (e?: UserEntry) => Object.values(e?.ratings ?? {}).some((r) => r.value != null);
-const hasData = (e: UserEntry) => !!e && (e.seen || e.rating != null || !!e.watchCount || activeNotes(e).length > 0 || hasAuthorRating(e));
+
+// Aggregate aus den „gesehen je Person"-Daten.
+const anySeen = (sb?: Record<string, AuthorSeen>) => Object.values(sb ?? {}).some((s) => (s.count ?? 0) > 0);
+const totalViews = (sb?: Record<string, AuthorSeen>) => Object.values(sb ?? {}).reduce((n, s) => n + Math.max(0, s.count ?? 0), 0);
+const lastSeenAt = (sb?: Record<string, AuthorSeen>) =>
+  Object.values(sb ?? {})
+    .filter((s) => (s.count ?? 0) > 0)
+    .reduce((m, s) => Math.max(m, s.at ?? 0), 0);
+// Aggregat-Felder (seen/watchCount/seenAt) aus seenBy neu berechnen; Alt-Werte bleiben, wenn seenBy leer ist.
+const withSeenAggregates = (e: UserEntry): UserEntry => {
+  if (!e.seenBy || !Object.keys(e.seenBy).length) return e;
+  return { ...e, seen: anySeen(e.seenBy), watchCount: totalViews(e.seenBy), seenAt: lastSeenAt(e.seenBy) || undefined };
+};
+
+const hasData = (e: UserEntry) => !!e && (e.seen || e.rating != null || !!e.watchCount || activeNotes(e).length > 0 || hasAuthorRating(e) || anySeen(e.seenBy));
 const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
 const KEY = 'filmkatalog.userdata.v1';
@@ -46,12 +69,13 @@ const KEY = 'filmkatalog.userdata.v1';
 interface Ctx {
   data: UserDataMap;
   entry: (id: string) => UserEntry;
-  setSeen: (id: string, seen: boolean) => void;
   setRating: (id: string, rating: number | null) => void;
   authorRatings: (id: string) => Record<string, AuthorRating>; // Bewertungen je Autor
   setAuthorRating: (id: string, author: string, value: number) => void;
   clearAuthorRating: (id: string, author: string) => void;
-  setWatchCount: (id: string, n: number) => void;
+  authorSeen: (id: string) => Record<string, AuthorSeen>; // „gesehen" je Person
+  toggleSeen: (id: string, author: string) => void; // gesehen-Status einer Person umschalten
+  setAuthorWatchCount: (id: string, author: string, n: number) => void; // „×-gesehen" einer Person setzen
   notes: (id: string) => Note[]; // aktive Notizen in Anzeige-Reihenfolge
   addNote: (id: string, author: string, text: string) => void;
   editNote: (id: string, noteId: string, text: string, author?: string) => void;
@@ -95,10 +119,6 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
     setData((d) => ({ ...d, [id]: { ...d[id], ...p, updatedAt: Date.now() } }));
   }, []);
 
-  const setSeen = useCallback(
-    (id: string, seen: boolean) => patch(id, { seen, watchCount: seen ? Math.max(1, dataRef.current[id]?.watchCount || 0) || 1 : 0 }),
-    [patch],
-  );
   const setRating = useCallback((id: string, rating: number | null) => patch(id, { rating }), [patch]);
 
   // Bewertung je Autor (eigener Zeitstempel; Gesamtwertung = Durchschnitt).
@@ -118,10 +138,29 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
       return { ...d, [id]: { ...e, ratings, rating: avgRating(ratings), updatedAt: Date.now() } };
     });
   }, []);
-  const setWatchCount = useCallback(
-    (id: string, n: number) => patch(id, { watchCount: Math.max(0, n), seen: n > 0 ? true : dataRef.current[id]?.seen }),
-    [patch],
-  );
+  // „Gesehen" je Person (eigener Zeitstempel; Aggregate seen/watchCount/seenAt werden abgeleitet).
+  const authorSeen = useCallback((id: string) => dataRef.current[id]?.seenBy ?? {}, []);
+  const toggleSeen = useCallback((id: string, author: string) => {
+    setData((d) => {
+      const e = d[id] ?? {};
+      const cur = e.seenBy?.[author];
+      const nowSeen = !(cur && cur.count > 0);
+      const entry: AuthorSeen = nowSeen ? { count: Math.max(1, cur?.count ?? 0) || 1, at: Date.now() } : { count: 0, at: cur?.at ?? Date.now() };
+      const seenBy = { ...(e.seenBy ?? {}), [author]: entry };
+      return { ...d, [id]: withSeenAggregates({ ...e, seenBy, updatedAt: Date.now() }) };
+    });
+  }, []);
+  const setAuthorWatchCount = useCallback((id: string, author: string, n: number) => {
+    setData((d) => {
+      const e = d[id] ?? {};
+      const prev = e.seenBy?.[author]?.count ?? 0;
+      const count = Math.max(0, n);
+      // Hochzählen = erneut gesehen → Datum aktualisieren; sonst alten Zeitstempel behalten.
+      const at = count > prev ? Date.now() : e.seenBy?.[author]?.at ?? Date.now();
+      const seenBy = { ...(e.seenBy ?? {}), [author]: { count, at } };
+      return { ...d, [id]: withSeenAggregates({ ...e, seenBy, updatedAt: Date.now() }) };
+    });
+  }, []);
 
   // Notizen tragen EIGENE Zeitstempel (kein Bump von entry.updatedAt), damit der
   // Geräte-Merge Skalar-Felder und Notizen unabhängig zusammenführt.
@@ -214,6 +253,14 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
       }
       return m;
     };
+    // „Gesehen" je Person zusammenführen (neuester at gewinnt).
+    const mergeSeenBy = (a: Record<string, AuthorSeen> = {}, b: Record<string, AuthorSeen> = {}): Record<string, AuthorSeen> => {
+      const m: Record<string, AuthorSeen> = { ...a };
+      for (const [author, s] of Object.entries(b)) {
+        if (!m[author] || (s.at ?? 0) > (m[author].at ?? 0)) m[author] = s;
+      }
+      return m;
+    };
     for (const id of new Set([...Object.keys(local), ...Object.keys(remote || {})])) {
       const l = local[id];
       const r = (remote || {})[id];
@@ -226,12 +273,17 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
       const base = (r.updatedAt ?? 0) > (l.updatedAt ?? 0) ? r : l;
       const notes = mergeNotes(l.notes, r.notes);
       const ratings = mergeRatings(l.ratings, r.ratings);
-      const out: UserEntry = { ...base };
+      const seenBy = mergeSeenBy(l.seenBy, r.seenBy);
+      let out: UserEntry = { ...base };
       if (notes.length) out.notes = notes;
       else delete out.notes;
       if (Object.keys(ratings).length) {
         out.ratings = ratings;
         out.rating = avgRating(ratings); // Gesamtwertung aus den zusammengeführten Autoren-Bewertungen
+      }
+      if (Object.keys(seenBy).length) {
+        out.seenBy = seenBy;
+        out = withSeenAggregates(out); // seen/watchCount/seenAt aus zusammengeführten „gesehen"-Daten
       }
       merged[id] = out;
     }
@@ -243,12 +295,13 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
     () => ({
       data,
       entry: (id) => data[id] ?? {},
-      setSeen,
       setRating,
       authorRatings,
       setAuthorRating,
       clearAuthorRating,
-      setWatchCount,
+      authorSeen,
+      toggleSeen,
+      setAuthorWatchCount,
       notes,
       addNote,
       editNote,
@@ -261,7 +314,7 @@ export function UserDataProvider({ children }: { children: ReactNode }) {
       snapshot,
       mergeRemote,
     }),
-    [data, setSeen, setRating, authorRatings, setAuthorRating, clearAuthorRating, setWatchCount, notes, addNote, editNote, deleteNote, reorderNotes, exportJSON, importJSON, clearAll, snapshot, mergeRemote],
+    [data, setRating, authorRatings, setAuthorRating, clearAuthorRating, authorSeen, toggleSeen, setAuthorWatchCount, notes, addNote, editNote, deleteNote, reorderNotes, exportJSON, importJSON, clearAll, snapshot, mergeRemote],
   );
 
   return <C.Provider value={value}>{children}</C.Provider>;
