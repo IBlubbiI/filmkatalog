@@ -146,7 +146,7 @@ export function WatchlistPage() {
             </button>
           </div>
         ) : (
-          <p className="text-xs text-zinc-500">Filme, die mindestens zwei von euch sehen wollen.</p>
+          <p className="text-xs text-zinc-500">Filme, die mindestens zwei Personen sehen wollen.</p>
         )}
         {mode === 'liste' && list.length > 0 && (
           <button onClick={pickRandom} className="inline-flex items-center gap-1.5 rounded-lg border border-ink-600 bg-ink-800 px-3 py-1.5 text-sm text-zinc-200 hover:border-ink-500">
@@ -161,8 +161,8 @@ export function WatchlistPage() {
           {list.length === 0 ? (
             <p className="rounded-xl bg-ink-800/60 p-4 text-sm text-zinc-500 ring-1 ring-white/5">
               {who === GEMEINSAM
-                ? 'Noch keine gemeinsamen Filme – sobald zwei von euch denselben Film merken, erscheint er hier.'
-                : 'Noch nichts gemerkt. Tippe auf einem Film auf „Merken" – oder nutze „Durchblättern".'}
+                ? 'Noch keine gemeinsamen Filme – sobald zwei Personen denselben Film merken, erscheint er hier.'
+                : 'Noch nichts gemerkt – über „Merken" auf einer Filmseite oder über „Durchblättern" hinzufügen.'}
             </p>
           ) : (
             <div className="space-y-1">

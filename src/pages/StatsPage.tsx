@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useData } from '../lib/data';
 import { useUserData } from '../lib/userData';
@@ -17,7 +17,7 @@ function DriveSync() {
     <div className="mt-4 border-t border-ink-700/70 pt-4">
       <h3 className="mb-1 text-sm font-semibold text-zinc-200">Geräte-Sync über Google Drive</h3>
       {!s.enabled ? (
-        <p className="text-xs text-zinc-500">Wird gerade eingerichtet – danach kannst du Tablet & Handy hier verbinden.</p>
+        <p className="text-xs text-zinc-500">Wird gerade eingerichtet – danach lassen sich Tablet & Handy hier verbinden.</p>
       ) : s.status === 'connected' ? (
         <div>
           <p className="mb-2 text-xs text-accent-soft">
@@ -36,7 +36,7 @@ function DriveSync() {
       ) : (
         <div>
           <p className="mb-2 text-xs text-zinc-500">
-            Verbinde dein Google-Konto, damit deine Bewertungen automatisch zwischen deinen Geräten abgeglichen werden.
+            Google-Konto verbinden, damit die Bewertungen automatisch zwischen den Geräten abgeglichen werden.
           </p>
           <button
             onClick={s.connect}
@@ -62,10 +62,10 @@ function MyDataSection() {
 
   return (
     <section className="mt-8 rounded-xl bg-ink-800/60 p-4 ring-1 ring-white/5">
-      <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-accent/80">Meine Bewertungen</h2>
+      <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-accent/80">Bewertungen & Daten</h2>
       <p className="mb-3 text-xs text-zinc-500">
         {count === 0
-          ? 'Noch keine – bewerte Filme auf ihrer Detailseite.'
+          ? 'Noch keine – Bewertung erfolgt auf der jeweiligen Detailseite.'
           : `${seen} gesehen · ${rated} bewertet. Gespeichert auf diesem Gerät.`}
       </p>
       <div className="flex flex-wrap gap-2">
@@ -99,8 +99,8 @@ function MyDataSection() {
       </div>
       {msg && <p className="mt-2 text-xs text-accent-soft">{msg}</p>}
       <p className="mt-3 text-[11px] leading-relaxed text-zinc-600">
-        Hinweis: Diese Bewertungen liegen auf diesem Gerät (nicht in der Excel). Mit „Sichern" legst du eine Datei zum
-        Aufbewahren an – oder du verbindest unten Google Drive für den automatischen Abgleich zwischen deinen Geräten.
+        Hinweis: Diese Bewertungen liegen auf diesem Gerät (nicht in der Excel). „Sichern" legt eine Datei zum
+        Aufbewahren an – alternativ unten Google Drive für den automatischen Abgleich zwischen den Geräten verbinden.
       </p>
 
       <DriveSync />
@@ -322,7 +322,7 @@ function PersonalStats() {
       <section className="mt-8">
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-accent/80">Film-Aktivität</h2>
         <p className="rounded-xl bg-ink-800/60 p-4 text-xs text-zinc-500 ring-1 ring-white/5">
-          Noch keine Daten – markiere Filme als „gesehen" und bewerte sie auf der Detailseite, dann erscheinen hier eure
+          Noch keine Daten – Filme auf der Detailseite als „gesehen" markieren und bewerten, dann erscheinen hier die
           persönlichen Statistiken.
         </p>
       </section>
@@ -385,7 +385,7 @@ function PersonalStats() {
 
           <RankList title="Top-Filme" rows={p.topRated} onPick={(id) => navigate(`/film/${id}`)} />
           <RankList title="Am häufigsten gesehen" rows={p.rewatched} onPick={(id) => navigate(`/film/${id}`)} suffix="×" />
-          {!person && <RankList title="Wo ihr euch uneinig seid" rows={p.disagree} onPick={(id) => navigate(`/film/${id}`)} />}
+          {!person && <RankList title="Größte Diskrepanz" rows={p.disagree} onPick={(id) => navigate(`/film/${id}`)} />}
 
           <p className="mt-3 text-[11px] leading-relaxed text-zinc-600">
             „Letzter Monat/Jahr" zählt, wann ein Film als gesehen markiert wurde. Für ältere Einträge ohne Datum gilt der
@@ -560,7 +560,7 @@ function JahresRueckblick() {
         <Stat value={r.bestMonth} label="bester Monat" small />
         <Stat value={r.topGenre} label="Top-Genre" small />
       </div>
-      <RankList title={`Deine Filme ${activeYear}`} rows={r.films} onPick={(id) => navigate(`/film/${id}`)} />
+      <RankList title={`Gesehene Filme ${activeYear}`} rows={r.films} onPick={(id) => navigate(`/film/${id}`)} />
     </section>
   );
 }
@@ -619,7 +619,21 @@ export function StatsPage() {
   const navigate = useNavigate();
   const { showFilter } = useCatalog();
   const M = data.movies;
-  const [dash, setDash] = useState('umfang');
+  // Gewähltes Dashboard merken, damit es nach „Zurück" aus dem Katalog erhalten bleibt.
+  const [dash, setDash] = useState(() => {
+    try {
+      return localStorage.getItem('filmkatalog.stats.dash') || 'umfang';
+    } catch {
+      return 'umfang';
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem('filmkatalog.stats.dash', dash);
+    } catch {
+      /* localStorage nicht verfügbar → nur pro Sitzung */
+    }
+  }, [dash]);
 
   const stats = useMemo(() => {
     const totalMin = M.reduce((s, m) => s + (m.runtime ?? 0), 0);

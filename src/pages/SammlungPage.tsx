@@ -488,7 +488,7 @@ export function SammlungPage() {
         <p className="py-16 text-center text-zinc-500">Lädt…</p>
       ) : mode === 'missing' && buyList ? (
         buyRows.length === 0 ? (
-          <p className="py-16 text-center text-zinc-500">Dir fehlt nichts aus deinen Reihen. 🎉</p>
+          <p className="py-16 text-center text-zinc-500">Keine fehlenden Titel in den Reihen. 🎉</p>
         ) : (
           <div className="mx-auto mt-4 max-w-2xl divide-y divide-ink-800/70">
             {buyRows.map(({ e, reihe }) => (

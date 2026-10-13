@@ -163,7 +163,7 @@ export function CatalogPage() {
           onClick={() => setRandomOpen(true)}
           disabled={results.length === 0}
           className="inline-flex items-center justify-center rounded-full bg-ink-750 px-4 py-3 text-zinc-100 shadow-lg shadow-black/40 ring-1 ring-white/10 hover:bg-ink-700 disabled:opacity-40"
-          aria-label="Überrasch mich"
+          aria-label="Zufallsfilm"
         >
           <IconDice />
         </button>

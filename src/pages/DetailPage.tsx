@@ -283,8 +283,8 @@ function MyRatingPanel({ movie }: { movie: Movie }) {
         {showLegend && (
           <div className="mt-1.5 rounded-lg bg-ink-850 p-3 ring-1 ring-white/5">
             <p className="mb-2 text-[11px] leading-relaxed text-zinc-400">
-              Tipp: <span className="text-zinc-300">6 ist schon „gut"</span>. Die 10 ist dem perfekten Film vorbehalten (den es praktisch nicht gibt) – heb dir die 9 für echte Meisterwerke auf, dann bleibt Spielraum nach oben.
-              Frag dich: Würde ich ihn <em>wieder</em> sehen? Weiterempfehlen? In einem Jahr noch erinnern?
+              Hinweis: <span className="text-zinc-300">6 ist schon „gut"</span>. Die 10 ist dem perfekten Film vorbehalten (den es praktisch nicht gibt) – die 9 bleibt echten Meisterwerken vorbehalten, so bleibt Spielraum nach oben.
+              Maßstab: nochmal sehenswert? weiterempfehlenswert? in einem Jahr noch erinnerbar?
             </p>
             <ul className="space-y-0.5">
               {RATING_LEGEND.map((r) => (
@@ -584,7 +584,7 @@ function NotesPanel({ movie }: { movie: Movie }) {
             </button>
           )}
         </div>
-        <RichNoteEditor key={composerKey} initialHtml="" onChange={setText} placeholder="Deine Gedanken zum Film…" minHeight={90} />
+        <RichNoteEditor key={composerKey} initialHtml="" onChange={setText} placeholder="Gedanken zum Film…" minHeight={90} />
         <div className="flex justify-end">
           <button
             onClick={submit}

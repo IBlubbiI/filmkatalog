@@ -109,7 +109,7 @@ export function DiscoverPage() {
             Auf TMDB ansehen ↗
           </a>
         </div>
-        <p className="mt-3 text-[11px] text-zinc-600">Infos von TMDB · Titel (noch) nicht in deiner Sammlung.</p>
+        <p className="mt-3 text-[11px] text-zinc-600">Infos von TMDB · Titel (noch) nicht in der Sammlung.</p>
       </div>
     </div>
   );

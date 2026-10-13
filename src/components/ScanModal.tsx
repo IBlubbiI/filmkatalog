@@ -108,8 +108,8 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
             ) : (
               <p className="rounded-xl bg-ink-800 p-3 text-xs text-zinc-500">
                 {camState === 'unsupported'
-                  ? 'Dieses Gerät/Browser kann keinen Barcode über die Kamera lesen (z. B. iPhone-Safari). Gib die EAN unten manuell ein.'
-                  : 'Kein Kamerazugriff. Gib die EAN unten manuell ein.'}
+                  ? 'Dieses Gerät/Browser kann keinen Barcode über die Kamera lesen (z. B. iPhone-Safari). EAN unten manuell eingeben.'
+                  : 'Kein Kamerazugriff. EAN unten manuell eingeben.'}
               </p>
             )}
 
@@ -136,7 +136,7 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
           <div>
             {result.movies.length === 0 ? (
               <div className="text-center">
-                <p className="text-sm text-zinc-200">Nicht in deiner Sammlung.</p>
+                <p className="text-sm text-zinc-200">Nicht in der Sammlung.</p>
                 <p className="mt-1 text-xs text-zinc-500">EAN {result.ean}</p>
                 <Link to={`/verwalten`} onClick={onClose} className="mt-3 inline-block rounded-lg bg-ink-700 px-4 py-2 text-sm text-zinc-200 hover:bg-ink-600">
                   In Verwalten anlegen
@@ -145,7 +145,7 @@ export function ScanModal({ onClose }: { onClose: () => void }) {
             ) : (
               <>
                 <p className="mb-2 text-xs text-zinc-500">
-                  {result.movies.length === 1 ? 'Gefunden – du besitzt ihn:' : `${result.movies.length} Titel mit dieser EAN (Box):`}
+                  {result.movies.length === 1 ? 'In der Sammlung vorhanden:' : `${result.movies.length} Titel mit dieser EAN (Box):`}
                 </p>
                 <div className="space-y-1">
                   {result.movies.map((m) => (
